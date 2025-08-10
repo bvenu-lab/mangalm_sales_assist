@@ -1,0 +1,25 @@
+{
+  "name": "@mangalm/data-import",
+  "version": "1.0.0",
+  "description": "Data import utilities for Mangalm Sales Assistant",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "import:csv": "ts-node import-invoices-csv.ts",
+    "import:db": "ts-node import-to-database.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/pg": "^8.10.7",
+    "@types/uuid": "^9.0.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}

@@ -1,0 +1,92 @@
+Client interview and existing ecosystem and journey 
+
+
+
+
+Scenario:** Small business owners or nontechnical companies want customized software solutions but can't afford the cost or time investment of the existing large solution. They just want a solution that does what they need, the way they need it, and with none of the extra fluff or costs. Wants an easy to use interface with minimal questions to define the product/solution that they want, the interface, I/O, pain-points, product-requirements, etc.
+ 
+Why does this matter :
+
+
+ July 25th - customer interview at the client side 
+
+
+ Client Name : Mangalm Inc , official distributors for Indian food products , exclusive dealers for prominent brands for the west coast 
+
+
+Customer insight ( interview 1 ) :This customer is a small -scale supply chain distributor who specialize in Indian pre-packaged products
+ like savory , frozen and everyday consumables. The business has grown2 x where in ,there now they have  acquired more square footage and
+  more overseas shipments. The logistics pipeline remains same from the procurement and fulfillment aspect with not a health sales cycle.
+   the intent is to improve the velocity of sales with existing pipeline of customers and establish new ones . While digital transformation
+    is deeply embedded in their existing infrastructure the sales mechanism is pretty dated with them adopting traditional vehicles of having
+     a sales agent working with existing customers via calls and .xls. while this has been effective to maintain the business relationship 
+     and an ongoing view of sales it does limit the customer to know where and what is needed by the end customers. As of today the , there
+      are around 250 locally owned business being supported by this customer ,
+ 
+Current Journey (Sales Agent):  everyday morning the orders are fulfilled based on the calls being initiated by the sales person, the sales person has
+ to reference  100’s of previous invoices which become their baseline for these calls to help predict the fullfillment for each store. 
+ On these calls the sales agent, once establishes contact with the main point person in the store, inquires for the current inventory level
+ and accordingly updates the order fulfillment list, but the store rarely gives them the quantity that they need and the sales agent needs to 
+ suggest quantities. The sales agent currently bases the quantity estimates on their internal tools, which is usually .xls sheets and provide the
+  approximate buy order for that day. The sales agent calls specific customers periodiciatlly, weekly or more frequently, depending on the size of
+   the end customer every few days, there is no real format or process for this now. The sales agent calling the stores, apart from just replenishing the inventory of
+   the end customer, also works to upsell any items which they may have or would like to have (think this as a classic sales motion).
+   With 250 signed up stores, they are looking at calls made to at-least “x“ stores, each call lasting “ y “ minutes. The main objective of this 
+   sales agent is to amplify the sales motion by providing more options, deals, incentives to any one of the 250 customers. 
+   The assumption for now is that based on archived invoices over duration x, the sales person could lead the discussion with the store in 
+   a direction where the basket size / order size is more than what could have been if it was just a regular sales call.
+ 
+As of today the customer has integrations to over 4 other systems for various reasons , they do not have a cohesive end to end platform of
+ digital fabric which would help them with this visibility. The core of their system has zoho a CRM engine and some other low imoact systems 
+ for daily operations.
+ 
+The second part of the journey is for this customer to have a complete view of the route “ fulfillment center” to the end stores which are
+ geographically spread over a “ z” miles. This would help them optimize their drive time and mileage , thus impacting their bottom-line 
+ sales margin. Apart from this it would also enable them to add more fleet vehicles if needed and the capacity of these fleet vehicles.
+ 
+July 28th , This was the second round of clarifying the requirements or rather the aspirations of this client, the client wants to expand
+ their logistics business to So-cal especially the LA , Seattle and the mid-west in salt lake city Utah. As of now these far areas are 
+ fulfilled by shipping the assets to them via standard shippers like DHL , USPS, UPS and other 2nd tier logistics operators. The areas 
+ near to their main warehouse they have a fleet of smaller trucks to serve the end poit grocery stores and restaurants. The max distance
+  is from the bay area to Sacramento and its neighborhoods.
+ 
+The intent of the client is to have a central hub in bay area while they have regions mapped out, with each region served by one sales head, this sales head would be responsible for customer discovery , customer engagement , retention and acceleration. The day-to-day job of theses sales head involves but not restricted to
+-clear view on the overall inventory
+-ability to anticipate growing asset needs
+-ability to manage reverse logistics ( items which have not been sold or on the shelf too long )
+-sales strategies to increase sales volume
+- discounts when assets near expiry dates
+-identify secondary markets when the sales of goods is not executed in the anticipated times
+- reduce costs on any reverse logistics
+ 
+Warehouse ecosystems –physical
+ 
+Around 24,000 Sqft. of space with 3/ 4 aisles , each around 25 x 200 ft , 3 cold storage units for perishables which require a sub temperature zone to maintain freshness and quality, one cooler zone meant as a holding area for products which require temps below ambient temperatures, the warehouse is equipped with basic. IT infrastructure like wifi access and cat 6e laid out , wireless points , server backroom ( optional if one wants to use it ) , cameras installed for security . there are no other advanced sensor or IOT equipment or any advanced tech on the floor .there is a thought of maybe adding a conveyer belt if and when the demand increases and possibility of adding sensors which would come into play for shipping receivables. Also there is a thought process to procure bar code scanners to start managing the audit portion of the assets.
+ 
+
+
+
+
+Type of Assets
+ 
+Pre-packaged products predominantly from manufacturers in India. The assets as of now does not include any fresh produce and can be classified as dry , semi solid and liquid produces . Most of these items fall under one of the two categories with a few mapped to liquid . All products arrive in standard cartons of varying dimensions ( note: this is not from one manufacturer but procured by a variety of them from India) All of these arrive in cartons of varying dimensions , most having the brand logo and a bar code , there is no real standardization on the count of products in it or key dates likes date of manufacturing , expiry , shelf life , temp limitations etc.
+ 
+While the dry products constitute almost 70 to 75 percent of the products , rest are semi liquid solid savories ( indian sweets ) shipped in plastic containers( 5-gallon buckets or more ). These products are not sold individually but in cartons and in bulk. While almost the entire inventory is from other market leading brands , the client has started manufacturing and shipping their own products with their own branding , the list of these items are very few and from that the most prominent are rice and wheat bags ( 10 lbs and above )
+ 
+ 
+Warehouse ecosystem: process
+ 
+ Completely manual , the procurement , shipping , landing , asset count , audit all are manually done with v. high human touch ,there is one person on their payroll who is responsible for looking through daily order sheets  and working through the aisles and shelf , loading the pallets and then onto the truck. This order fulfillment process happens almost on a daily basis , there is no real frequency or pre-defined times on when the orders are fulfilled or when the pallets have to be dispatched to the end customer. Of when and what goes on the pallet is predetermined
+ 
+Ordering Mechanism
+ 
+ the orders are received via text messages and most often a snap shot of a bill of materials ( .pdf ). Apart from this there is also a WhatsApp group created with most customers on it , the client publishes a list of new goods or replenished goods. The end customers would review the list and based on their inventory respond on the app either free form text field or provide a printout of the list and publish on the whatsapp group . many times, the end customer would also call the client directly for any inventory support
+ 
+Low inventory issues: 
+ 
+The inventory audit and checks is done on a monthly basis and the assets are updated on an excel spread sheet.
+-
+ 
+Sales
+ 
+

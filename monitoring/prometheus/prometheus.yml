@@ -1,0 +1,100 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'mangalm-monitor'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Node Exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          database: 'mangalm_sales'
+
+  # API Gateway metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['host.docker.internal:3007']
+        labels:
+          service: 'api-gateway'
+          component: 'backend'
+    metrics_path: '/metrics'
+
+  # AI Prediction Service metrics
+  - job_name: 'ai-prediction-service'
+    static_configs:
+      - targets: ['host.docker.internal:3001']
+        labels:
+          service: 'ai-prediction'
+          component: 'backend'
+    metrics_path: '/metrics'
+
+  # PM Orchestrator metrics
+  - job_name: 'pm-orchestrator'
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+        labels:
+          service: 'pm-orchestrator'
+          component: 'backend'
+    metrics_path: '/metrics'
+
+  # Zoho Integration metrics
+  - job_name: 'zoho-integration'
+    static_configs:
+      - targets: ['host.docker.internal:3003']
+        labels:
+          service: 'zoho-integration'
+          component: 'backend'
+    metrics_path: '/metrics'
+
+  # Frontend metrics (if exposed)
+  - job_name: 'frontend'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          service: 'frontend'
+          component: 'ui'
+    metrics_path: '/metrics'
+
+  # Jaeger metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+        labels:
+          service: 'jaeger'
+
+  # Loki metrics
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          service: 'loki'

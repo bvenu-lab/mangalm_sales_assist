@@ -1,0 +1,80 @@
+src/ml/automl-service.ts(105,9): error TS2345: Argument of type 'string' is not assignable to parameter of type 'Algorithm'.
+src/ml/automl-service.ts(262,11): error TS2345: Argument of type 'string' is not assignable to parameter of type 'Algorithm'.
+src/ml/automl-service.ts(404,11): error TS2345: Argument of type 'string' is not assignable to parameter of type 'Algorithm'.
+src/ml/enterprise-ml-engine.ts(9,28): error TS2307: Cannot find module 'crypto' or its corresponding type declarations.
+src/ml/enterprise-ml-engine.ts(188,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(277,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(473,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(488,58): error TS2554: Expected 1 arguments, but got 2.
+src/ml/enterprise-ml-engine.ts(493,47): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'number[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'number[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(495,47): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'number[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'number[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(496,45): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'number[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'number[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(497,49): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'number[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'number[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(499,57): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'any[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'any[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(500,59): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'any[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'any[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(501,53): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'any[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'any[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(503,71): error TS2345: Argument of type 'Promise<PredictionResult>' is not assignable to parameter of type 'any[]'.
+  Type 'Promise<PredictionResult>' is missing the following properties from type 'any[]': length, pop, push, concat, and 28 more.
+src/ml/enterprise-ml-engine.ts(585,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(638,17): error TS2393: Duplicate function implementation.
+src/ml/enterprise-ml-engine.ts(749,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(767,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(793,9): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(804,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(1301,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(1443,53): error TS2554: Expected 1 arguments, but got 2.
+src/ml/enterprise-ml-engine.ts(1454,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(1476,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(1483,5): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/ml/enterprise-ml-engine.ts(1501,16): error TS2393: Duplicate function implementation.
+src/ml/model-registry.ts(7,28): error TS2307: Cannot find module '../../../../shared/src/cache/redis-cache' or its corresponding type declarations.
+src/ml/model-registry.ts(392,27): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'ModelMetrics'.
+  No index signature with a parameter of type 'string' was found on type 'ModelMetrics'.
+src/routes/auth-routes.ts(29,19): error TS2591: Cannot find name 'Buffer'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
+src/services/database/mock-database.ts(1,21): error TS2307: Cannot find module 'fs' or its corresponding type declarations.
+src/services/database/mock-database.ts(19,38): error TS2304: Cannot find name '__dirname'.
+src/services/database/mock-database.ts(26,9): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/services/database/mock-database.ts(33,40): error TS2304: Cannot find name '__dirname'.
+src/services/database/mock-database.ts(40,9): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/services/database/mock-database.ts(43,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+src/services/prediction/prediction-service.ts(6,28): error TS6059: File 'C:/code/mangalm/services/shared/src/cache/redis-cache.ts' is not under 'rootDir' 'C:/code/mangalm/services/ai-prediction-service/src'. 'rootDir' is expected to contain all source files.
+src/services/prediction/prediction-service.ts(46,13): error TS2353: Object literal may only specify known properties, and 'validation' does not exist in type 'TrainingConfig'.
+src/services/prediction/prediction-service.ts(119,11): error TS2353: Object literal may only specify known properties, and 'validation' does not exist in type 'TrainingConfig'.
+src/services/prediction/prediction-service.ts(131,11): error TS2353: Object literal may only specify known properties, and 'validation' does not exist in type 'TrainingConfig'.
+src/services/prediction/prediction-service.ts(138,42): error TS2345: Argument of type 'string' is not assignable to parameter of type 'string[]'.
+src/services/prediction/prediction-service.ts(312,72): error TS2554: Expected 1 arguments, but got 2.
+src/services/prediction/prediction-service.ts(319,42): error TS2339: Property 'value' does not exist on type 'PredictionResult'.
+src/services/prediction/prediction-service.ts(323,75): error TS2339: Property 'value' does not exist on type 'PredictionResult'.
+src/services/prediction/prediction-service.ts(370,44): error TS2339: Property 'value' does not exist on type 'PredictionResult'.
+src/services/prediction/prediction-service.ts(374,85): error TS2339: Property 'value' does not exist on type 'PredictionResult'.
+src/services/prediction/prediction-service.ts(623,29): error TS2554: Expected 2 arguments, but got 1.
+src/services/prediction/prediction-service.ts(895,11): error TS2353: Object literal may only specify known properties, and 'validation' does not exist in type 'TrainingConfig'.
+src/services/prediction/prediction-service.ts(908,11): error TS2353: Object literal may only specify known properties, and 'validation' does not exist in type 'TrainingConfig'.
+src/services/prediction/prediction-service.ts(961,34): error TS2341: Property 'explainPrediction' is private and only accessible within class 'EnterpriseMLEngine'.
+src/services/prediction/prediction-service.ts(1031,42): error TS2345: Argument of type 'string' is not assignable to parameter of type 'string[]'.
+../shared/src/cache/redis-cache.ts(7,28): error TS2307: Cannot find module 'crypto' or its corresponding type declarations.
+../shared/src/cache/redis-cache.ts(8,27): error TS2307: Cannot find module 'util' or its corresponding type declarations.
+../shared/src/cache/redis-cache.ts(9,30): error TS2307: Cannot find module 'zlib' or its corresponding type declarations.
+../shared/src/cache/redis-cache.ts(49,11): error TS2564: Property 'client' has no initializer and is not definitely assigned in the constructor.
+../shared/src/cache/redis-cache.ts(122,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(127,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(132,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(136,33): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(170,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(214,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(235,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(277,41): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(308,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(343,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(362,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(418,9): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(463,9): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(485,7): error TS2584: Cannot find name 'console'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
+../shared/src/cache/redis-cache.ts(549,26): error TS2591: Cannot find name 'Buffer'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.

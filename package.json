@@ -1,0 +1,55 @@
+{
+  "name": "@mangalm/root",
+  "version": "1.0.0",
+  "description": "Mangalm Sales Assistant - AI-powered sales prediction and order management system",
+  "private": true,
+  "scripts": {
+    "install:all": "npm run install:database && npm run install:ai && npm run install:zoho && npm run install:frontend && npm run install:import",
+    "install:database": "cd database && npm install",
+    "install:ai": "cd services/ai-prediction-service && npm install",
+    "install:zoho": "cd services/zoho-integration && npm install",
+    "install:frontend": "cd services/sales-frontend && npm install",
+    "install:import": "cd services/data-import && npm install",
+    "build:all": "npm run build:database && npm run build:ai && npm run build:zoho && npm run build:frontend",
+    "build:database": "cd database && npm run build",
+    "build:ai": "cd services/ai-prediction-service && npm run build",
+    "build:zoho": "cd services/zoho-integration && npm run build",
+    "build:frontend": "cd services/sales-frontend && npm run build",
+    "test:all": "npm run test:ai && npm run test:zoho",
+    "test:ai": "cd services/ai-prediction-service && npm test",
+    "test:zoho": "cd services/zoho-integration && npm test",
+    "start:all": "concurrently \"npm run start:ai\" \"npm run start:frontend\"",
+    "start:ai": "cd services/ai-prediction-service && npm start",
+    "start:frontend": "cd services/sales-frontend && npm start",
+    "start:zoho": "cd services/zoho-integration && npm start",
+    "docker:build": "npm run docker:build:ai && npm run docker:build:zoho",
+    "docker:build:ai": "cd services/ai-prediction-service && docker build -t mangalm/ai-prediction:latest .",
+    "docker:build:zoho": "cd services/zoho-integration && docker build -t mangalm/zoho-integration:latest .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "db:setup": "npm run db:create && npm run db:migrate && npm run db:seed",
+    "db:create": "node scripts/create-database.js",
+    "db:migrate": "node scripts/run-migrations.js",
+    "db:seed": "node scripts/seed-database.js",
+    "import:csv": "cd services/data-import && npm run import:csv",
+    "import:db": "cd services/data-import && npm run import:db",
+    "clean": "npm run clean:ai && npm run clean:zoho && npm run clean:frontend",
+    "clean:ai": "cd services/ai-prediction-service && rm -rf node_modules dist",
+    "clean:zoho": "cd services/zoho-integration && rm -rf node_modules dist",
+    "clean:frontend": "cd services/sales-frontend && rm -rf node_modules build",
+    "validate": "node scripts/validate-setup.js"
+  },
+  "workspaces": [
+    "database",
+    "services/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.3.1",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

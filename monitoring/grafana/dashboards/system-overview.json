@@ -1,0 +1,218 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "mangalm-system-overview",
+    "title": "Mangalm System Overview",
+    "tags": ["mangalm", "system", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "type": "stat",
+        "title": "System Uptime",
+        "targets": [
+          {
+            "expr": "time() - process_start_time_seconds{job=~\"api-gateway|ai-prediction-service|pm-orchestrator|zoho-integration\"}",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 3600 },
+                { "color": "green", "value": 86400 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "type": "stat",
+        "title": "Total Requests",
+        "targets": [
+          {
+            "expr": "sum(rate(mangalm_http_requests_total[5m])) * 60",
+            "legendFormat": "Requests/min"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "rpm",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 100 },
+                { "color": "red", "value": 500 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "type": "stat",
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(mangalm_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(mangalm_http_requests_total[5m])) * 100",
+            "legendFormat": "Error %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "type": "stat",
+        "title": "Active Users",
+        "targets": [
+          {
+            "expr": "mangalm_websocket_connections",
+            "legendFormat": "Active Users"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 50 },
+                { "color": "red", "value": 100 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "type": "graph",
+        "title": "Request Rate by Service",
+        "targets": [
+          {
+            "expr": "sum by(service) (rate(mangalm_http_requests_total[5m])) * 60",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "rpm", "label": "Requests/min" },
+          { "format": "short" }
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "type": "graph",
+        "title": "Response Time (95th percentile)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by(service, le) (rate(mangalm_http_request_duration_seconds_bucket[5m])))",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "s", "label": "Response Time" },
+          { "format": "short" }
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "type": "graph",
+        "title": "CPU Usage",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=~\"api-gateway|ai-prediction-service|pm-orchestrator|zoho-integration\"}[5m]) * 100",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "percent", "label": "CPU %" },
+          { "format": "short" }
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "type": "graph",
+        "title": "Memory Usage",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=~\"api-gateway|ai-prediction-service|pm-orchestrator|zoho-integration\"} / 1024 / 1024",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "decmbytes", "label": "Memory" },
+          { "format": "short" }
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "type": "graph",
+        "title": "Database Connections",
+        "targets": [
+          {
+            "expr": "mangalm_database_pool_active_connections",
+            "legendFormat": "Active - {{pool}}"
+          },
+          {
+            "expr": "mangalm_database_pool_size",
+            "legendFormat": "Pool Size - {{pool}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "short", "label": "Connections" },
+          { "format": "short" }
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "type": "graph",
+        "title": "Cache Performance",
+        "targets": [
+          {
+            "expr": "rate(mangalm_cache_hits_total[5m])",
+            "legendFormat": "Hits - {{cache}}"
+          },
+          {
+            "expr": "rate(mangalm_cache_misses_total[5m])",
+            "legendFormat": "Misses - {{cache}}"
+          }
+        ],
+        "yaxes": [
+          { "format": "ops", "label": "Operations/sec" },
+          { "format": "short" }
+        ]
+      }
+    ]
+  }
+}

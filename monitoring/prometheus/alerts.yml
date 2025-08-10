@@ -1,0 +1,135 @@
+groups:
+  - name: mangalm_alerts
+    interval: 30s
+    rules:
+      # Service availability alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "{{ $labels.service }} has been down for more than 2 minutes."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is above 5% for {{ $labels.service }}. Current value: {{ $value }}"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High response time on {{ $labels.service }}"
+          description: "95th percentile response time is above 1s for {{ $labels.service }}. Current value: {{ $value }}s"
+
+      # Database connection issues
+      - alert: DatabaseConnectionFailure
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Cannot connect to PostgreSQL database for more than 1 minute."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 90%. Current usage: {{ $value | humanizePercentage }}"
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80%. Current usage: {{ $value }}%"
+
+      # Disk space warning
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.10
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Low disk space on root partition"
+          description: "Less than 10% disk space remaining. Available: {{ $value | humanizePercentage }}"
+
+      # Service restart frequency
+      - alert: FrequentServiceRestarts
+        expr: changes(process_start_time_seconds[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          component: stability
+        annotations:
+          summary: "Service {{ $labels.service }} is restarting frequently"
+          description: "{{ $labels.service }} has restarted {{ $value }} times in the last hour"
+
+      # Queue buildup
+      - alert: QueueBacklog
+        expr: rabbitmq_queue_messages_ready > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: messaging
+        annotations:
+          summary: "Message queue backlog detected"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages waiting"
+
+      # API rate limit approaching
+      - alert: APIRateLimitWarning
+        expr: rate(api_rate_limit_hits_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API rate limit approaching for {{ $labels.service }}"
+          description: "API rate limit usage at {{ $value | humanizePercentage }} for {{ $labels.service }}"
+
+      # Prediction service latency
+      - alert: PredictionServiceSlow
+        expr: histogram_quantile(0.95, rate(prediction_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "AI prediction service is slow"
+          description: "95th percentile prediction time is above 5s. Current: {{ $value }}s"
+
+      # Database connection pool exhaustion
+      - alert: DatabasePoolExhausted
+        expr: database_pool_active_connections / database_pool_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database connection pool is at {{ $value | humanizePercentage }} capacity"
