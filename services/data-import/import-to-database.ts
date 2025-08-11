@@ -154,9 +154,9 @@ class DatabaseImporter {
         if (imported % 1000 === 0) {
           console.log(`  Imported ${imported}/${items.length} items...`);
         }
-      } catch (error) {
+      } catch (error: any) {
         // Silently skip duplicates
-        if (!error.message.includes('duplicate key')) {
+        if (!error.message?.includes('duplicate key')) {
           console.error(`Error importing invoice item:`, error);
         }
       }

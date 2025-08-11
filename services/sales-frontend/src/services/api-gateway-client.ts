@@ -34,6 +34,13 @@ export class ApiGatewayClient {
     // Add request interceptor for authentication
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
+        // Log request details
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+          params: config.params,
+          data: config.data,
+          headers: config.headers
+        });
+        
         if (this.authToken) {
           config.headers = config.headers || {};
           config.headers['Authorization'] = `Bearer ${this.authToken}`;
@@ -41,6 +48,7 @@ export class ApiGatewayClient {
         return config;
       },
       (error) => {
+        console.error('[API Request Error]', error);
         return Promise.reject(error);
       }
     );
@@ -48,14 +56,32 @@ export class ApiGatewayClient {
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
+        // Log successful response
+        console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data
+        });
         return response;
       },
       (error) => {
+        // Log error response
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          error: error.message
+        });
+        
         // Handle authentication errors
         if (error.response && error.response.status === 401) {
-          // Clear auth token and redirect to login
+          console.log('[Auth] 401 Unauthorized - Clearing auth token');
+          // Clear auth token but don't redirect if we're already on login page
           this.clearAuthToken();
-          window.location.href = '/login';
+          if (!window.location.pathname.includes('/login')) {
+            console.log('[Auth] Redirecting to login page');
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }
@@ -96,17 +122,29 @@ export class ApiGatewayClient {
   }
 
   /**
+   * Clear all authentication data
+   */
+  public clearAllAuth(): void {
+    this.authToken = null;
+    localStorage.removeItem('auth_token');
+    // Clear any other auth-related data
+    localStorage.removeItem('user');
+  }
+
+  /**
    * Login
    */
   public async login(username: string, password: string): Promise<any> {
+    console.log('[Auth] Attempting login for user:', username);
     try {
       const response = await this.client.post('/auth/login', { username, password });
       if (response.data.token) {
+        console.log('[Auth] Login successful, token received');
         this.setAuthToken(response.data.token);
       }
       return response.data;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[Auth] Login failed:', error);
       throw error;
     }
   }
@@ -115,11 +153,13 @@ export class ApiGatewayClient {
    * Logout
    */
   public async logout(): Promise<void> {
+    console.log('[Auth] Attempting logout');
     try {
       await this.client.post('/auth/logout');
+      console.log('[Auth] Logout successful');
       this.clearAuthToken();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[Auth] Logout error:', error);
       // Clear token anyway
       this.clearAuthToken();
       throw error;
@@ -130,11 +170,13 @@ export class ApiGatewayClient {
    * Get stores
    */
   public async getStores(params?: any): Promise<any> {
+    console.log('[Data] Fetching stores with params:', params);
     try {
-      const response = await this.client.get('/mangalm/stores', { params });
-      return response.data;
+      const response = await this.client.get('/api/stores', { params });
+      console.log(`[Data] Retrieved ${response.data?.data?.length || 0} stores`);
+      return response.data?.data || [];
     } catch (error) {
-      console.error('Get stores error:', error);
+      console.error('[Data] Failed to fetch stores:', error);
       throw error;
     }
   }
@@ -144,7 +186,7 @@ export class ApiGatewayClient {
    */
   public async getStoreById(id: string): Promise<any> {
     try {
-      const response = await this.client.get(`/mangalm/stores/${id}`);
+      const response = await this.client.get(`/api/stores/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Get store ${id} error:`, error);
@@ -156,11 +198,13 @@ export class ApiGatewayClient {
    * Get products
    */
   public async getProducts(params?: any): Promise<any> {
+    console.log('[Data] Fetching products with params:', params);
     try {
-      const response = await this.client.get('/mangalm/products', { params });
-      return response.data;
+      const response = await this.client.get('/api/products', { params });
+      console.log(`[Data] Retrieved ${response.data?.data?.length || 0} products`);
+      return response.data?.data || [];
     } catch (error) {
-      console.error('Get products error:', error);
+      console.error('[Data] Failed to fetch products:', error);
       throw error;
     }
   }
@@ -170,7 +214,7 @@ export class ApiGatewayClient {
    */
   public async getProductById(id: string): Promise<any> {
     try {
-      const response = await this.client.get(`/mangalm/products/${id}`);
+      const response = await this.client.get(`/api/products/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Get product ${id} error:`, error);
@@ -182,11 +226,13 @@ export class ApiGatewayClient {
    * Get historical invoices
    */
   public async getHistoricalInvoices(params?: any): Promise<any> {
+    console.log('[Data] Fetching historical invoices with params:', params);
     try {
-      const response = await this.client.get('/mangalm/invoices', { params });
+      const response = await this.client.get('/api/invoices', { params });
+      console.log(`[Data] Retrieved ${response.data?.length || 0} invoices`);
       return response.data;
     } catch (error) {
-      console.error('Get invoices error:', error);
+      console.error('[Data] Failed to fetch invoices:', error);
       throw error;
     }
   }
@@ -196,7 +242,7 @@ export class ApiGatewayClient {
    */
   public async getInvoiceById(id: string): Promise<any> {
     try {
-      const response = await this.client.get(`/mangalm/invoices/${id}`);
+      const response = await this.client.get(`/api/invoices/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Get invoice ${id} error:`, error);
@@ -208,11 +254,13 @@ export class ApiGatewayClient {
    * Get predicted orders
    */
   public async getPredictedOrders(params?: any): Promise<any> {
+    console.log('[Data] Fetching predicted orders with params:', params);
     try {
-      const response = await this.client.get('/mangalm/predicted-orders', { params });
+      const response = await this.client.get('/api/predicted-orders', { params });
+      console.log(`[Data] Retrieved ${response.data?.length || 0} predicted orders`);
       return response.data;
     } catch (error) {
-      console.error('Get predicted orders error:', error);
+      console.error('[Data] Failed to fetch predicted orders:', error);
       throw error;
     }
   }
@@ -222,7 +270,7 @@ export class ApiGatewayClient {
    */
   public async getPredictedOrderById(id: string): Promise<any> {
     try {
-      const response = await this.client.get(`/mangalm/predicted-orders/${id}`);
+      const response = await this.client.get(`/api/predicted-orders/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Get predicted order ${id} error:`, error);
@@ -235,7 +283,7 @@ export class ApiGatewayClient {
    */
   public async createOrder(orderData: any): Promise<any> {
     try {
-      const response = await this.client.post('/mangalm/orders', orderData);
+      const response = await this.client.post('/api/orders', orderData);
       return response.data;
     } catch (error) {
       console.error('Create order error:', error);
@@ -248,7 +296,7 @@ export class ApiGatewayClient {
    */
   public async updateOrder(id: string, orderData: any): Promise<any> {
     try {
-      const response = await this.client.put(`/mangalm/orders/${id}`, orderData);
+      const response = await this.client.put(`/api/orders/${id}`, orderData);
       return response.data;
     } catch (error) {
       console.error(`Update order ${id} error:`, error);
@@ -261,7 +309,7 @@ export class ApiGatewayClient {
    */
   public async deleteOrder(id: string): Promise<any> {
     try {
-      const response = await this.client.delete(`/mangalm/orders/${id}`);
+      const response = await this.client.delete(`/api/orders/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Delete order ${id} error:`, error);
@@ -273,11 +321,13 @@ export class ApiGatewayClient {
    * Get call prioritization
    */
   public async getCallPrioritization(params?: any): Promise<any> {
+    console.log('[Data] Fetching call prioritization with params:', params);
     try {
-      const response = await this.client.get('/mangalm/call-prioritization', { params });
+      const response = await this.client.get('/api/call-prioritization', { params });
+      console.log(`[Data] Retrieved ${response.data?.length || 0} call prioritizations`);
       return response.data;
     } catch (error) {
-      console.error('Get call prioritization error:', error);
+      console.error('[Data] Failed to fetch call prioritization:', error);
       throw error;
     }
   }
@@ -286,11 +336,13 @@ export class ApiGatewayClient {
    * Get sales agent performance
    */
   public async getSalesAgentPerformance(params?: any): Promise<any> {
+    console.log('[Data] Fetching sales agent performance with params:', params);
     try {
-      const response = await this.client.get('/mangalm/sales-agent-performance', { params });
+      const response = await this.client.get('/api/sales-agent-performance', { params });
+      console.log('[Data] Retrieved sales agent performance data');
       return response.data;
     } catch (error) {
-      console.error('Get sales agent performance error:', error);
+      console.error('[Data] Failed to fetch sales agent performance:', error);
       throw error;
     }
   }
@@ -301,7 +353,7 @@ export class ApiGatewayClient {
   public async getAIPredictions(storeId: string, months?: number): Promise<any> {
     try {
       const params = months ? { months } : undefined;
-      const response = await this.client.get(`/mangalm/ai-predictions/stores/${storeId}`, { params });
+      const response = await this.client.get(`/api/ai-predictions/stores/${storeId}`, { params });
       return response.data;
     } catch (error) {
       console.error(`Get AI predictions for store ${storeId} error:`, error);
@@ -318,7 +370,7 @@ export class ApiGatewayClient {
         months: months || 1,
         forceUpdate: forceUpdate || false
       };
-      const response = await this.client.post(`/mangalm/ai-predictions/stores/${storeId}`, data);
+      const response = await this.client.post(`/api/ai-predictions/stores/${storeId}`, data);
       return response.data;
     } catch (error) {
       console.error(`Generate AI predictions for store ${storeId} error:`, error);
@@ -331,7 +383,7 @@ export class ApiGatewayClient {
    */
   public async deleteAIPredictions(storeId: string): Promise<any> {
     try {
-      const response = await this.client.delete(`/mangalm/ai-predictions/stores/${storeId}`);
+      const response = await this.client.delete(`/api/ai-predictions/stores/${storeId}`);
       return response.data;
     } catch (error) {
       console.error(`Delete AI predictions for store ${storeId} error:`, error);
@@ -348,7 +400,7 @@ export class ApiGatewayClient {
         months: months || 1,
         forceUpdate: forceUpdate || false
       };
-      const response = await this.client.post('/mangalm/ai-predictions/batch', data);
+      const response = await this.client.post('/api/ai-predictions/batch', data);
       return response.data;
     } catch (error) {
       console.error('Generate batch AI predictions error:', error);
@@ -361,7 +413,7 @@ export class ApiGatewayClient {
    */
   public async syncZohoStores(): Promise<any> {
     try {
-      const response = await this.client.post('/mangalm/zoho/sync/stores');
+      const response = await this.client.post('/api/zoho/sync/stores');
       return response.data;
     } catch (error) {
       console.error('Sync Zoho stores error:', error);
@@ -374,7 +426,7 @@ export class ApiGatewayClient {
    */
   public async syncZohoProducts(): Promise<any> {
     try {
-      const response = await this.client.post('/mangalm/zoho/sync/products');
+      const response = await this.client.post('/api/zoho/sync/products');
       return response.data;
     } catch (error) {
       console.error('Sync Zoho products error:', error);
@@ -387,7 +439,7 @@ export class ApiGatewayClient {
    */
   public async syncZohoInvoices(): Promise<any> {
     try {
-      const response = await this.client.post('/mangalm/zoho/sync/invoices');
+      const response = await this.client.post('/api/zoho/sync/invoices');
       return response.data;
     } catch (error) {
       console.error('Sync Zoho invoices error:', error);
@@ -400,7 +452,7 @@ export class ApiGatewayClient {
    */
   public async syncZohoAll(triggerAiUpdate: boolean = true): Promise<any> {
     try {
-      const response = await this.client.post('/mangalm/zoho/sync/all', { triggerAiUpdate });
+      const response = await this.client.post('/api/zoho/sync/all', { triggerAiUpdate });
       return response.data;
     } catch (error) {
       console.error('Sync all Zoho data error:', error);
@@ -413,7 +465,7 @@ export class ApiGatewayClient {
    */
   public async getZohoSchedulerJobs(): Promise<any> {
     try {
-      const response = await this.client.get('/mangalm/zoho/scheduler/jobs');
+      const response = await this.client.get('/api/zoho/scheduler/jobs');
       return response.data;
     } catch (error) {
       console.error('Get Zoho scheduler jobs error:', error);
@@ -426,7 +478,7 @@ export class ApiGatewayClient {
    */
   public async startZohoSchedulerJob(name: string): Promise<any> {
     try {
-      const response = await this.client.post(`/mangalm/zoho/scheduler/jobs/${name}/start`);
+      const response = await this.client.post(`/api/zoho/scheduler/jobs/${name}/start`);
       return response.data;
     } catch (error) {
       console.error(`Start Zoho scheduler job ${name} error:`, error);
@@ -443,7 +495,7 @@ export class ApiGatewayClient {
         forceUpdate: forceUpdate || false,
         agentId
       };
-      const response = await this.client.post('/mangalm/prioritization/calls/generate', data);
+      const response = await this.client.post('/api/prioritization/calls/generate', data);
       return response.data;
     } catch (error) {
       console.error('Generate call prioritizations error:', error);
@@ -457,7 +509,7 @@ export class ApiGatewayClient {
   public async getCallPrioritizationsForAgent(agentId: string, status?: string): Promise<any> {
     try {
       const params = status ? { status } : undefined;
-      const response = await this.client.get(`/mangalm/prioritization/calls/agents/${agentId}`, { params });
+      const response = await this.client.get(`/api/prioritization/calls/agents/${agentId}`, { params });
       return response.data;
     } catch (error) {
       console.error(`Get call prioritizations for agent ${agentId} error:`, error);
@@ -474,7 +526,7 @@ export class ApiGatewayClient {
         status,
         notes
       };
-      const response = await this.client.put(`/mangalm/prioritization/calls/${id}/status`, data);
+      const response = await this.client.put(`/api/prioritization/calls/${id}/status`, data);
       return response.data;
     } catch (error) {
       console.error(`Update call prioritization ${id} status error:`, error);
@@ -490,7 +542,7 @@ export class ApiGatewayClient {
       const data = {
         agentId
       };
-      const response = await this.client.put(`/mangalm/prioritization/calls/${id}/assign`, data);
+      const response = await this.client.put(`/api/prioritization/calls/${id}/assign`, data);
       return response.data;
     } catch (error) {
       console.error(`Assign call prioritization ${id} error:`, error);
@@ -553,7 +605,7 @@ export class ApiGatewayClient {
 
 // Create singleton instance
 const apiGatewayClient = new ApiGatewayClient({
-  baseURL: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3000/api',
+  baseURL: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3001',
   timeout: 30000
 });
 

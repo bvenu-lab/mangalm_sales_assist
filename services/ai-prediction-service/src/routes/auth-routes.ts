@@ -26,7 +26,7 @@ router.post('/login', (req: Request, res: Response) => {
   
   if (username === TEST_CREDENTIALS.username && password === TEST_CREDENTIALS.password) {
     // Generate a simple token (NOT SECURE - for local testing only)
-    const token = Buffer.from(`${username}:${Date.now()}`).toString('base64');
+    const token = btoa(`${username}:${Date.now()}`);
     
     res.json({
       success: true,

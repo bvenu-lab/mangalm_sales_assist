@@ -76,9 +76,9 @@ const MainLayout: React.FC = () => {
   };
 
   // Handle logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleProfileMenuClose();
-    logout();
+    await logout();
   };
 
   // Define the sidebar content

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import config from '../config';
+import apiGatewayClient from '../services/api-gateway-client';
 
 interface User {
   id: string;
@@ -21,7 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
 }
 
@@ -40,7 +39,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check if user is already authenticated on mount
   useEffect(() => {
     const checkAuthOnMount = async () => {
-      await checkAuth();
+      console.log('[AuthContext] Checking authentication on mount...');
+      const isAuthenticated = await checkAuth();
+      console.log(`[AuthContext] Initial auth check complete: ${isAuthenticated ? 'Authenticated' : 'Not authenticated'}`);
       setIsLoading(false);
     };
     
@@ -48,67 +49,101 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const checkAuth = async (): Promise<boolean> => {
+    console.log('[AuthContext] Starting auth check...');
     try {
       const token = localStorage.getItem('auth_token');
       
       if (!token) {
+        console.log('[AuthContext] No auth token found in localStorage');
         setUser(null);
         return false;
       }
       
+      console.log('[AuthContext] Auth token found, verifying with backend...');
       // Verify token with backend
-      const response = await axios.get(`${config.apiUrl}/auth/verify`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      apiGatewayClient.setAuthToken(token);
+      const response = await apiGatewayClient.get('/auth/me');
       
-      if (response.data.success) {
-        setUser(response.data.user);
+      if (response.success && response.user) {
+        console.log('[AuthContext] Token verified successfully, user:', response.user);
+        setUser(response.user);
         return true;
       } else {
         // Token is invalid or expired
+        console.log('[AuthContext] Token invalid or expired, clearing auth data');
         localStorage.removeItem('auth_token');
+        apiGatewayClient.clearAuthToken();
         setUser(null);
         return false;
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
+    } catch (error: any) {
+      console.error('[AuthContext] Auth check failed:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      // Clear token on any error
+      console.log('[AuthContext] Clearing auth data due to error');
       localStorage.removeItem('auth_token');
+      apiGatewayClient.clearAuthToken();
       setUser(null);
       return false;
     }
   };
 
   const login = async (username: string, password: string): Promise<void> => {
+    console.log(`[AuthContext] Login attempt for user: ${username}`);
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await axios.post(`${config.apiUrl}/auth/login`, {
-        username,
-        password
-      });
+      const response = await apiGatewayClient.login(username, password);
       
-      if (response.data.success) {
-        localStorage.setItem('auth_token', response.data.token);
-        setUser(response.data.user);
+      if (response.success) {
+        console.log('[AuthContext] Login successful, setting user:', response.user);
+        setUser(response.user);
+        console.log('[AuthContext] Navigating to dashboard');
         navigate('/dashboard');
       } else {
-        setError(response.data.error || 'Login failed');
+        const errorMsg = response.error || 'Login failed';
+        console.error('[AuthContext] Login failed:', errorMsg);
+        setError(errorMsg);
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.response?.data?.error || 'Login failed. Please try again.');
+      console.error('[AuthContext] Login error:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      setError(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
+      console.log('[AuthContext] Login process complete');
     }
   };
 
-  const logout = (): void => {
-    localStorage.removeItem('auth_token');
-    setUser(null);
-    navigate('/login');
+  const logout = async (): Promise<void> => {
+    console.log('[AuthContext] Logout initiated');
+    try {
+      await apiGatewayClient.logout();
+      console.log('[AuthContext] Logout API call successful');
+    } catch (error: any) {
+      console.error('[AuthContext] Logout API error:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+    } finally {
+      // Clear all authentication data
+      console.log('[AuthContext] Clearing all authentication data');
+      setUser(null);
+      apiGatewayClient.clearAuthToken();
+      localStorage.removeItem('auth_token');
+      // Set flag to prevent auto-redirect on login page
+      sessionStorage.setItem('stay_on_login', 'true');
+      console.log('[AuthContext] Navigating to login page');
+      navigate('/login');
+    }
   };
 
   return (

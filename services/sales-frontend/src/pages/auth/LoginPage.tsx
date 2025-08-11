@@ -43,9 +43,13 @@ const LoginPage: React.FC = () => {
   
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    // Check if user explicitly wants to stay on login page (e.g., after logout)
+    const stayOnLogin = sessionStorage.getItem('stay_on_login');
+    if (isAuthenticated && !stayOnLogin) {
       navigate(from, { replace: true });
     }
+    // Clear the flag after checking
+    sessionStorage.removeItem('stay_on_login');
   }, [isAuthenticated, navigate, from]);
   
   // Set error from auth context

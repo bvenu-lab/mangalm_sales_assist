@@ -1,5 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
+const fs = require('fs');
+const path = require('path');
 import { parse } from 'csv-parse/sync';
 
 // Mock database using CSV files from user_journey folder
@@ -16,7 +16,7 @@ class MockDatabase {
   private loadData() {
     try {
       // Load invoices data
-      const invoicesPath = path.join(__dirname, '../../../../../user_journey/Invoices_Mangalam .csv');
+      const invoicesPath = path.join(process.cwd(), 'user_journey/Invoices_Mangalam .csv');
       if (fs.existsSync(invoicesPath)) {
         const invoicesCSV = fs.readFileSync(invoicesPath, 'utf-8');
         this.invoicesData = parse(invoicesCSV, {
@@ -30,7 +30,7 @@ class MockDatabase {
       }
 
       // Load sales order data if exists
-      const salesOrderPath = path.join(__dirname, '../../../../../user_journey/Sales_Order.csv');
+      const salesOrderPath = path.join(process.cwd(), 'user_journey/Sales_Order.csv');
       if (fs.existsSync(salesOrderPath)) {
         const salesOrderCSV = fs.readFileSync(salesOrderPath, 'utf-8');
         this.salesOrderData = parse(salesOrderCSV, {

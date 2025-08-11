@@ -19,6 +19,20 @@ const isLocalhost = Boolean(
 );
 
 export function register(config?: Config) {
+  // For development, skip service worker to avoid caching issues
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Service Worker disabled in development mode');
+    // Unregister any existing service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister();
+        });
+      });
+    }
+    return;
+  }
+
   if ('serviceWorker' in navigator) {
     // Wait for window load
     window.addEventListener('load', () => {
@@ -333,14 +347,15 @@ export async function subscribeToPushNotifications(): Promise<PushSubscription |
 }
 
 // Helper function to convert VAPID key
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
     .replace(/-/g, '+')
     .replace(/_/g, '/');
 
   const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
+  const buffer = new ArrayBuffer(rawData.length);
+  const outputArray = new Uint8Array(buffer);
 
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);

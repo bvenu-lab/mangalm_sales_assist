@@ -6,6 +6,9 @@ import { SimpleAuth } from '../auth/simple-auth';
 import { createAuthRoutes } from '../auth/auth-routes';
 import { createCorsConfig } from '../security/cors-config';
 import { setupEnterpriseApi } from '../api/enterprise-api-integration';
+import { createDashboardRoutes } from '../routes/dashboard-routes';
+import { storeRoutes } from '../routes/store-routes';
+import { productRoutes } from '../routes/product-routes';
 import { logger } from '../utils/logger';
 import { PortManager } from '../utils/port-manager';
 
@@ -18,6 +21,7 @@ export interface ServiceRoute {
     max: number;
   };
   roles?: string[];
+  pathPrefix?: string;
 }
 
 export class APIGateway {
@@ -37,10 +41,36 @@ export class APIGateway {
     // Create auth service and routes
     this.authService = new SimpleAuth();
     const authRouter = createAuthRoutes(this.authService);
+    
+    // Mount auth routes at both /auth and /api/auth for compatibility
     this.app.use('/auth', authRouter);
+    this.app.use('/api/auth', authRouter);
 
     logger.info('Authentication system initialized', {
-      endpoints: ['/auth/login', '/auth/logout', '/auth/me', '/auth/health']
+      endpoints: ['/auth/login', '/auth/logout', '/auth/me', '/auth/health',
+                  '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/auth/health']
+    });
+    
+    // Setup dashboard routes
+    const dashboardRouter = createDashboardRoutes();
+    this.app.use('/api', this.authService.authenticate, dashboardRouter);
+    
+    // Setup store routes with real database connection
+    this.app.use('/api', this.authService.authenticate, storeRoutes);
+    
+    // Setup product routes with real database connection
+    this.app.use('/api', this.authService.authenticate, productRoutes);
+    
+    logger.info('Dashboard routes initialized', {
+      endpoints: ['/api/calls/prioritized', '/api/stores/recent', '/api/orders/pending', '/api/performance/summary']
+    });
+    
+    logger.info('Store routes initialized', {
+      endpoints: ['/api/stores', '/api/stores/:id', '/api/stores/recent', '/api/stores/regions']
+    });
+    
+    logger.info('Product routes initialized', {
+      endpoints: ['/api/products', '/api/products/:id', '/api/products/categories', '/api/products/brands']
     });
   }
 
@@ -103,21 +133,13 @@ export class APIGateway {
   private setupRoutes(): void {
     // Define service routes
     this.routes = [
-      // Authentication service (AI Prediction Service handles auth for now)
-      {
-        path: '/api/auth',
-        target: 'http://localhost:3004',
-        auth: false, // Auth endpoints don't require auth
-        rateLimit: {
-          windowMs: 15 * 60 * 1000, // 15 minutes
-          max: 10 // limit each IP to 10 requests per windowMs
-        }
-      },
+      // Note: Authentication is handled internally by SimpleAuth, not proxied
+      // The /api/auth and /auth routes are configured in setupAuthentication()
 
       // AI Prediction Service
       {
         path: '/api/predictions',
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3006',
         auth: true,
         rateLimit: {
           windowMs: 60 * 1000, // 1 minute
@@ -125,30 +147,53 @@ export class APIGateway {
         }
       },
 
-      // Sales data endpoints (stores, products, performance)
-      {
-        path: '/api/stores',
-        target: 'http://localhost:3004',
-        auth: true
-      },
-      {
-        path: '/api/products',
-        target: 'http://localhost:3004',
-        auth: true
-      },
+      // Sales data endpoints - using wildcard paths to match all sub-routes
+      // Stores are now handled directly by API Gateway with database connection
+      // {
+      //   path: '/api/stores',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
+      // Products are now handled directly by API Gateway with database connection
+      // {
+      //   path: '/api/products',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
       {
         path: '/api/performance',
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3006',
         auth: true
       },
       {
         path: '/api/calls',
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3006',
+        auth: true
+      },
+      {
+        path: '/api/call-prioritization',
+        target: 'http://localhost:3006',
         auth: true
       },
       {
         path: '/api/orders',
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3006',
+        auth: true
+      },
+      {
+        path: '/mangalm/predicted-orders',
+        target: 'http://localhost:3006',
+        auth: true,
+        pathPrefix: '/api'
+      },
+      {
+        path: '/mangalm/invoices',
+        target: 'http://localhost:3006',
+        auth: true
+      },
+      {
+        path: '/mangalm/call-prioritization',
+        target: 'http://localhost:3006',
         auth: true
       },
 
@@ -209,8 +254,14 @@ export class APIGateway {
   }
 
   private createRoute(route: ServiceRoute): void {
+    // Use wildcard pattern to match all sub-paths
+    const routePath = route.path.endsWith('*') ? route.path : `${route.path}*`;
+    
+    console.log(`[API Gateway] Creating route: ${routePath} -> ${route.target}`);
+    
     // Apply rate limiting if specified
     if (route.rateLimit) {
+      console.log(`[API Gateway] Applying rate limit to ${routePath}: ${route.rateLimit.max} requests per ${route.rateLimit.windowMs}ms`);
       const limiter = rateLimit({
         windowMs: route.rateLimit.windowMs,
         max: route.rateLimit.max,
@@ -222,16 +273,16 @@ export class APIGateway {
         legacyHeaders: false
       });
       
-      this.app.use(route.path, limiter);
+      this.app.use(routePath, limiter);
     }
 
     // Apply authentication if required
     if (route.auth) {
-      this.app.use(route.path, this.authService.authenticate);
+      this.app.use(routePath, this.authService.authenticate);
       
       // Apply role-based authorization if specified
       if (route.roles) {
-        this.app.use(route.path, this.authService.requireRole(route.roles));
+        this.app.use(routePath, this.authService.requireRole(route.roles));
       }
     }
 
@@ -241,9 +292,18 @@ export class APIGateway {
       changeOrigin: true,
       pathRewrite: (path: string) => {
         // Remove the base path for forwarding to service
+        if (route.path === '/mangalm/predicted-orders' && path.startsWith('/mangalm/predicted-orders')) {
+          return path.replace('/mangalm/predicted-orders', '/api/predicted-orders');
+        }
+        if (route.path === '/mangalm/invoices' && path.startsWith('/mangalm/invoices')) {
+          return path; // Keep the path as is for invoices
+        }
         return path;
       },
       onProxyReq: (proxyReq: any, req: Request) => {
+        console.log(`[API Gateway] Proxying request: ${req.method} ${req.path} -> ${route.target}`);
+        console.log(`[API Gateway] Request headers:`, req.headers);
+        
         // Add service routing headers
         proxyReq.setHeader('X-Gateway-Route', route.path);
         proxyReq.setHeader('X-Gateway-Timestamp', new Date().toISOString());
@@ -251,17 +311,25 @@ export class APIGateway {
         // Forward user context if authenticated
         const user = this.authService.getCurrentUser(req);
         if (user) {
+          console.log(`[API Gateway] Forwarding user context: ${user.username} (${user.role})`);
           proxyReq.setHeader('X-User-Id', user.id);
           proxyReq.setHeader('X-User-Role', user.role);
           proxyReq.setHeader('X-User-Username', user.username);
+        } else {
+          console.log(`[API Gateway] No user context to forward`);
         }
       },
       onProxyRes: (proxyRes: any, req: Request, res: Response) => {
+        console.log(`[API Gateway] Proxy response: ${req.method} ${req.path} - Status: ${proxyRes.statusCode}`);
         // Add gateway headers to response
         res.setHeader('X-Gateway-Service', route.target);
         res.setHeader('X-Gateway-Route', route.path);
       },
       onError: (err: any, req: Request, res: Response) => {
+        console.error(`[API Gateway] Proxy error for ${req.method} ${req.path}:`, err.message);
+        console.error(`[API Gateway] Target service: ${route.target}`);
+        console.error(`[API Gateway] Error details:`, err);
+        
         logger.error('Proxy error', {
           route: route.path,
           target: route.target,
@@ -278,10 +346,11 @@ export class APIGateway {
     };
 
     const proxy = createProxyMiddleware(proxyOptions);
-    this.app.use(route.path, proxy);
+    this.app.use(routePath, proxy);
 
     logger.info('Route registered', {
-      path: route.path,
+      path: routePath,
+      originalPath: route.path,
       target: route.target,
       auth: route.auth,
       roles: route.roles
@@ -291,7 +360,7 @@ export class APIGateway {
 
   private getServiceStatus() {
     return {
-      'ai-prediction': { url: 'http://localhost:3004', status: 'unknown' },
+      'ai-prediction': { url: 'http://localhost:3006', status: 'unknown' },
       'pm-orchestrator': { url: 'http://localhost:3003', status: 'unknown' },
       'zoho-integration': { url: 'http://localhost:3002', status: 'unknown' }
     };

@@ -71,7 +71,7 @@ const StoreListPage: React.FC = () => {
       try {
         setLoading(true);
         const response = await api.store.getAll();
-        const storesData = response.data?.data || [];
+        const storesData = response || [];
         setStores(storesData);
         setFilteredStores(storesData);
         setLoading(false);

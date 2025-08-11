@@ -71,18 +71,26 @@ export const useNotification = () => {
 };
 
 // Custom transition components
-const SlideTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => 
-  <Slide ref={ref} {...props} direction="up" />
-);
-const GrowTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => 
-  <Grow ref={ref} {...props} />
-);
-const ZoomTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => 
-  <Zoom ref={ref} {...props} />
-);
-const FadeTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => 
-  <Fade ref={ref} {...props} />
-);
+const SlideTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => {
+  const { children, ...otherProps } = props;
+  const childElement = React.isValidElement(children) ? children : <div />;
+  return <Slide ref={ref} {...otherProps} direction="up">{childElement}</Slide>;
+});
+const GrowTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => {
+  const { children, ...otherProps } = props;
+  const childElement = React.isValidElement(children) ? children : <div />;
+  return <Grow ref={ref} {...otherProps}>{childElement}</Grow>;
+});
+const ZoomTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => {
+  const { children, ...otherProps } = props;
+  const childElement = React.isValidElement(children) ? children : <div />;
+  return <Zoom ref={ref} {...otherProps}>{childElement}</Zoom>;
+});
+const FadeTransition = React.forwardRef<unknown, TransitionProps>((props, ref) => {
+  const { children, ...otherProps } = props;
+  const childElement = React.isValidElement(children) ? children : <div />;
+  return <Fade ref={ref} {...otherProps}>{childElement}</Fade>;
+});
 
 const transitions = {
   slide: SlideTransition,

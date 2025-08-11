@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import { v4 as uuidv4 } from 'uuid';
 import { createReadStream } from 'fs';
 
@@ -81,7 +81,7 @@ class InvoiceCSVImporter {
           this.generateSummary();
           resolve();
         })
-        .on('error', (error) => {
+        .on('error', (error: any) => {
           console.error('Error reading CSV:', error);
           reject(error);
         });

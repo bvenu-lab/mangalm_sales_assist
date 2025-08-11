@@ -11,8 +11,6 @@ const API_CACHE_NAME = 'mangalm-sales-api-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/static/css/main.css',
-  '/static/js/main.js',
   '/manifest.json',
   '/favicon.ico',
   '/offline.html',
@@ -41,7 +39,14 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[ServiceWorker] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // Filter out non-existent assets in development
+        return Promise.all(
+          STATIC_ASSETS.map(url =>
+            cache.add(url).catch(err => {
+              console.warn(`[ServiceWorker] Failed to cache ${url}:`, err);
+            })
+          )
+        );
       })
       .then(() => {
         console.log('[ServiceWorker] Skip waiting');
@@ -92,6 +97,27 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome-extension and other non-http protocols
   if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Skip webpack hot module replacement
+  if (url.pathname.includes('hot-update')) {
+    return;
+  }
+
+  // Skip React DevTools
+  if (url.pathname.includes('__react')) {
+    return;
+  }
+
+  // Handle webpack chunk files - always fetch from network
+  if (url.pathname.includes('/static/js/') && url.pathname.includes('.chunk.js')) {
+    event.respondWith(
+      fetch(request).catch(() => {
+        // If chunk fails to load, return error instead of cached response
+        return new Response('Chunk loading failed', { status: 404 });
+      })
+    );
     return;
   }
 

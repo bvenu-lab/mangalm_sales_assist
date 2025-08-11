@@ -31,7 +31,7 @@ import {
   ArrowDownward as ArrowDownwardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
-import axios from 'axios';
+import apiGatewayClient from '../../services/api-gateway-client';
 import { format } from 'date-fns';
 import { 
   CallPrioritization, 
@@ -68,34 +68,57 @@ const DashboardPage: React.FC = () => {
   // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
+      console.log('[Dashboard] Starting to fetch dashboard data...');
+      const startTime = Date.now();
+      
       try {
         setLoading(true);
         setError(null);
 
+        console.log('[Dashboard] Fetching prioritized call list...');
         // Fetch call list
-        const callListResponse = await axios.get('/api/calls/prioritized?limit=5');
+        const callListResponse = await apiGatewayClient.get('/api/calls/prioritized?limit=5');
+        console.log(`[Dashboard] Call list fetched: ${callListResponse.data?.length || 0} calls`);
         
+        console.log('[Dashboard] Fetching recent stores...');
         // Fetch recent stores
-        const recentStoresResponse = await axios.get('/api/stores/recent?limit=5');
+        const recentStoresResponse = await apiGatewayClient.get('/api/stores/recent?limit=5');
+        console.log(`[Dashboard] Recent stores fetched: ${recentStoresResponse.data?.length || 0} stores`);
         
+        console.log('[Dashboard] Fetching pending orders...');
         // Fetch pending orders
-        const pendingOrdersResponse = await axios.get('/api/orders/pending?limit=5');
+        const pendingOrdersResponse = await apiGatewayClient.get('/api/orders/pending?limit=5');
+        console.log(`[Dashboard] Pending orders fetched: ${pendingOrdersResponse.data?.length || 0} orders`);
         
+        console.log('[Dashboard] Fetching performance summary...');
         // Fetch performance data
-        const performanceResponse = await axios.get('/api/performance/summary');
+        const performanceResponse = await apiGatewayClient.get('/api/performance/summary');
+        console.log('[Dashboard] Performance data fetched:', performanceResponse.data);
 
         // Set dashboard data
-        setDashboardData({
-          callList: callListResponse.data.data,
-          recentStores: recentStoresResponse.data.data,
-          pendingOrders: pendingOrdersResponse.data.data,
-          performance: performanceResponse.data.data,
-        });
+        const dashboardData = {
+          callList: callListResponse.data || [],
+          recentStores: recentStoresResponse.data || [],
+          pendingOrders: pendingOrdersResponse.data || [],
+          performance: performanceResponse.data || null,
+        };
+        
+        console.log('[Dashboard] Setting dashboard data:', dashboardData);
+        setDashboardData(dashboardData);
+        
+        const loadTime = Date.now() - startTime;
+        console.log(`[Dashboard] Dashboard data loaded successfully in ${loadTime}ms`);
       } catch (error: any) {
-        console.error('Error fetching dashboard data:', error);
+        const loadTime = Date.now() - startTime;
+        console.error(`[Dashboard] Failed to fetch dashboard data after ${loadTime}ms:`, {
+          error: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
         setError('Failed to load dashboard data. Please try again later.');
       } finally {
         setLoading(false);
+        console.log('[Dashboard] Loading state set to false');
       }
     };
 
@@ -104,6 +127,7 @@ const DashboardPage: React.FC = () => {
 
   // Handle refresh
   const handleRefresh = () => {
+    console.log('[Dashboard] Refresh button clicked - reloading page');
     // Reload the dashboard data
     window.location.reload();
   };
@@ -262,7 +286,7 @@ const DashboardPage: React.FC = () => {
                                 variant="body2"
                                 color="text.primary"
                               >
-                                Priority Score: {call.priorityScore.toFixed(1)}
+                                Priority Score: {(call.priorityScore || 0).toFixed(1)}
                               </Typography>
                               {call.priorityReason && (
                                 <Typography variant="body2" component="span">
@@ -402,10 +426,12 @@ const DashboardPage: React.FC = () => {
                                 variant="body2"
                                 color="text.primary"
                               >
-                                Predicted on {format(new Date(order.predictionDate), 'MMM d, yyyy')}
+                                {order.predictionDate 
+                                  ? `Predicted on ${format(new Date(order.predictionDate), 'MMM d, yyyy')}`
+                                  : 'Prediction date not available'}
                               </Typography>
                               <Typography variant="body2" component="span">
-                                {' — '}Confidence: {(order.confidenceScore || 0 * 100).toFixed(1)}%
+                                {' — '}Confidence: {((order.confidenceScore || 0) * 100).toFixed(1)}%
                               </Typography>
                             </React.Fragment>
                           }

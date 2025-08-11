@@ -56,12 +56,23 @@ export class SimpleAuth {
       isActive: true
     };
 
+    const demoUser: User = {
+      id: 'demo-default',
+      username: 'demo',
+      email: 'demo@local.dev',
+      role: 'admin',
+      passwordHash: Buffer.from('demo2025').toString('base64'),
+      isActive: true
+    };
+
     this.users.set(adminUser.username, adminUser);
     this.users.set(regularUser.username, regularUser);
+    this.users.set(demoUser.username, demoUser);
 
     logger.info('Default users initialized', {
       admin: 'username: admin, password: admin123',
-      user: 'username: user, password: user123'
+      user: 'username: user, password: user123',
+      demo: 'username: demo, password: demo2025'
     });
   }
 
@@ -69,16 +80,19 @@ export class SimpleAuth {
    * Authenticate user with username/password
    */
   public async login(username: string, password: string): Promise<AuthResult> {
+    console.log(`[Auth] Login attempt for username: ${username}`);
     try {
       const user = this.users.get(username);
       
       if (!user || !user.isActive) {
+        console.log(`[Auth] Login failed - user not found or inactive: ${username}`);
         return { success: false, error: 'Invalid username or password' };
       }
 
       // Simple password check (in production, use bcrypt.compare)
       const expectedPassword = Buffer.from(user.passwordHash, 'base64').toString();
       if (password !== expectedPassword) {
+        console.log(`[Auth] Login failed - invalid password for: ${username}`);
         return { success: false, error: 'Invalid username or password' };
       }
 
@@ -101,6 +115,8 @@ export class SimpleAuth {
         isActive: user.isActive
       };
 
+      console.log(`[Auth] Login successful for ${username} (${user.role})`);
+      console.log(`[Auth] Generated token: ${token.substring(0, 30)}...`);
       logger.info('User logged in successfully', { username });
 
       return {
@@ -119,14 +135,17 @@ export class SimpleAuth {
    * Middleware to authenticate JWT token
    */
   public authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    console.log(`[Auth] Authenticating request: ${req.method} ${req.path}`);
     try {
       const authHeader = req.headers.authorization;
       const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
       if (!token) {
+        console.log(`[Auth] No token provided for ${req.path}`);
         res.status(401).json({ error: 'Access token required' });
         return;
       }
+      console.log(`[Auth] Token received: ${token?.substring(0, 30)}...`);
 
       // Verify JWT
       const decoded = jwt.verify(token, this.jwtSecret) as any;
@@ -134,9 +153,11 @@ export class SimpleAuth {
       // Get user info
       const user = Array.from(this.users.values()).find(u => u.id === decoded.userId);
       if (!user || !user.isActive) {
+        console.log(`[Auth] User not found or inactive: ${decoded.userId}`);
         res.status(401).json({ error: 'User not found or inactive' });
         return;
       }
+      console.log(`[Auth] Token validated for user: ${user.username} (${user.role})`);
 
       // Attach user info to request
       (req as any).user = {
@@ -149,6 +170,7 @@ export class SimpleAuth {
       next();
 
     } catch (error: any) {
+      console.log(`[Auth] Token authentication failed: ${error.message}`);
       logger.error('Token authentication failed', { error: error.message });
       res.status(403).json({ error: 'Invalid token' });
     }

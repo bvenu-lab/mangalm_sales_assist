@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend API</title>
+</head>
+<body>
+    <h1>Testing Store Page API Integration</h1>
+    <div id="status"></div>
+    <div id="results"></div>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        
+        async function testStoreAPI() {
+            statusDiv.innerHTML = '<p>Testing API connection...</p>';
+            
+            try {
+                // Step 1: Login
+                statusDiv.innerHTML += '<p>1. Logging in...</p>';
+                const loginResponse = await fetch('http://localhost:3001/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.token;
+                statusDiv.innerHTML += '<p style="color: green;">✓ Login successful</p>';
+                
+                // Step 2: Fetch stores
+                statusDiv.innerHTML += '<p>2. Fetching stores...</p>';
+                const storesResponse = await fetch('http://localhost:3001/api/stores', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const storesData = await storesResponse.json();
+                statusDiv.innerHTML += `<p style="color: green;">✓ Stores fetched: ${storesData.data ? storesData.data.length : 0} stores</p>`;
+                
+                // Display results
+                resultsDiv.innerHTML = '<h2>Store Data:</h2><pre>' + JSON.stringify(storesData, null, 2) + '</pre>';
+                
+                // Check what the frontend sees
+                statusDiv.innerHTML += '<h3>Frontend API Test:</h3>';
+                
+                // Test with localStorage token if exists
+                const storedToken = localStorage.getItem('auth_token');
+                if (storedToken) {
+                    statusDiv.innerHTML += '<p>Found stored token in localStorage</p>';
+                    const frontendStoresResponse = await fetch('http://localhost:3001/api/stores', {
+                        headers: {
+                            'Authorization': `Bearer ${storedToken}`
+                        }
+                    });
+                    const frontendStoresData = await frontendStoresResponse.json();
+                    statusDiv.innerHTML += `<p style="color: green;">✓ Frontend token works: ${frontendStoresData.data ? frontendStoresData.data.length : 0} stores</p>`;
+                } else {
+                    statusDiv.innerHTML += '<p style="color: orange;">No token in localStorage - user needs to login</p>';
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Test failed:', error);
+            }
+        }
+        
+        // Run test on page load
+        testStoreAPI();
+    </script>
+</body>
+</html>

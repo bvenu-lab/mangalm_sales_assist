@@ -11,6 +11,7 @@ import { SkeletonDashboard } from './components/loading/LoadingSkeleton';
 
 // Lazy load pages for better performance
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const ClearAuthPage = lazy(() => import('./pages/auth/ClearAuthPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
 const StoreListPage = lazy(() => import('./pages/stores/StoreListPage'));
 const StoreDetailPage = lazy(() => import('./pages/stores/StoreDetailPage'));
@@ -41,6 +42,7 @@ const App: React.FC = () => {
         <Route path="/login" element={
           isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
         } />
+        <Route path="/clear-auth" element={<ClearAuthPage />} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

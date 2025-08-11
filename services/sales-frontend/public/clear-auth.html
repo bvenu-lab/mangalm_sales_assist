@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Authentication</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Authentication Management</h1>
+        <p>Use this page to clear stored authentication tokens</p>
+        
+        <button onclick="clearAuth()">Clear Authentication</button>
+        <button onclick="goToLogin()">Go to Login</button>
+        
+        <div id="message" class="message"></div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <h3>Current Storage Status:</h3>
+            <p>Auth Token: <span id="tokenStatus">Checking...</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Check current status on load
+        function checkStatus() {
+            const token = localStorage.getItem('auth_token');
+            const statusEl = document.getElementById('tokenStatus');
+            if (token) {
+                statusEl.textContent = 'Present (length: ' + token.length + ')';
+                statusEl.style.color = 'orange';
+            } else {
+                statusEl.textContent = 'Not found';
+                statusEl.style.color = 'green';
+            }
+        }
+
+        function clearAuth() {
+            // Clear all authentication-related data
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            sessionStorage.clear();
+            
+            // Show success message
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = 'Authentication cleared successfully!';
+            messageEl.className = 'message success';
+            messageEl.style.display = 'block';
+            
+            // Update status
+            checkStatus();
+            
+            // Redirect to login after 2 seconds
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+        }
+
+        function goToLogin() {
+            // Set flag to prevent auto-redirect
+            sessionStorage.setItem('stay_on_login', 'true');
+            window.location.href = '/login';
+        }
+
+        // Check status on page load
+        checkStatus();
+    </script>
+</body>
+</html>

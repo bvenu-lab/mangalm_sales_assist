@@ -4,28 +4,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { v4 as uuidv4 } from 'uuid';
-import { logger, stream } from './utils/logger';
-import config from './config';
-// Import routes
-import healthRoutes from './routes/health-routes';
-// import predictionRoutes from './routes/prediction-routes';
-// import prioritizationRoutes from './routes/prioritization-routes';
+import { logger } from './utils/logger';
 import authRoutes from './routes/auth-routes';
 import mockDataRoutes from './routes/mock-data-routes';
-import callPrioritizationRoutes from './routes/call-prioritization-routes';
-// import vectorRoutes from './routes/vector-routes';
+import healthRoutes from './routes/health-routes';
 
-// Add request ID to express Request interface
-declare global {
-  namespace Express {
-    interface Request {
-      id?: string;
-      headers: any;
-    }
-  }
-}
-
-// Create Express server
 const app = express();
 
 // Add request ID middleware
@@ -40,9 +23,9 @@ app.use(helmet());
 
 // Enable Cross Origin Resource Sharing
 app.use(cors({
-  origin: config.cors.origin,
-  methods: config.cors.methods,
-  allowedHeaders: config.cors.allowedHeaders,
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 // Compress response bodies
@@ -55,19 +38,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // HTTP request logger
-app.use(morgan('combined', { stream }));
+app.use(morgan('combined'));
 
 // API routes
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/call-prioritization', callPrioritizationRoutes);
-app.use('/mangalm/call-prioritization', callPrioritizationRoutes);
-app.use('/api', mockDataRoutes); // Mock data routes for all /api/* endpoints
-app.use('/', mockDataRoutes); // Also mount at root for direct access from gateway
-app.use('/mangalm', mockDataRoutes); // Also mount at /mangalm for gateway routing
-// app.use('/api/predictions', predictionRoutes);
-// app.use('/api/prioritization', prioritizationRoutes);
-// app.use('/api/vector', vectorRoutes); // Vector database routes
+app.use('/api', mockDataRoutes);
+app.use('/', mockDataRoutes);
+app.use('/mangalm', mockDataRoutes);
 
 // Error handling middleware
 app.use((err: any, req: any, res: any, next: any) => {
@@ -87,10 +65,10 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 // Start Express server
-const server = app.listen(config.server.port, () => {
-  logger.info(`Server started in ${config.server.nodeEnv} mode`);
-  logger.info(`Listening on port ${config.server.port}`);
-  logger.info(`http://localhost:${config.server.port}`);
+const port = parseInt(process.env.PORT || '3006');
+const server = app.listen(port, () => {
+  logger.info(`AI Prediction Service started on port ${port}`);
+  logger.info(`http://localhost:${port}`);
 });
 
 // Handle graceful shutdown
@@ -134,5 +112,4 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Export Express server for testing
 export default app;

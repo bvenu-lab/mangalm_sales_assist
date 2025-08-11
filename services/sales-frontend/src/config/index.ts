@@ -31,9 +31,9 @@ const config = {
   
   // Service endpoints
   services: {
-    apiGateway: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3000',
-    zohoIntegration: process.env.REACT_APP_ZOHO_INTEGRATION_URL || 'http://localhost:3001',
-    aiPrediction: process.env.REACT_APP_AI_PREDICTION_URL || 'http://localhost:3002',
+    apiGateway: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3001',
+    zohoIntegration: process.env.REACT_APP_ZOHO_INTEGRATION_URL || 'http://localhost:3002',
+    aiPrediction: process.env.REACT_APP_AI_PREDICTION_URL || 'http://localhost:3006',
   },
   
   // Logging configuration
