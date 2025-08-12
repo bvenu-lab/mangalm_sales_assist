@@ -51,17 +51,18 @@ export class InvoiceRepository {
                    'id', ii.id,
                    'invoiceId', ii.invoice_id,
                    'productId', ii.product_id,
-                   'productName', ii.product_name,
-                   'productCode', ii.product_code,
+                   'productName', COALESCE(p.name, 'Unknown Product'),
+                   'productCode', NULL,
                    'quantity', ii.quantity,
                    'unitPrice', ii.unit_price,
                    'totalPrice', ii.total_price,
-                   'discount', ii.discount,
-                   'taxAmount', ii.tax_amount
+                   'discount', 0,
+                   'taxAmount', 0
                  )
                ) as items
         FROM historical_invoices i
         LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+        LEFT JOIN products p ON ii.product_id = p.id
         WHERE 1=1
       `;
       
@@ -217,17 +218,18 @@ export class InvoiceRepository {
                    'id', ii.id,
                    'invoiceId', ii.invoice_id,
                    'productId', ii.product_id,
-                   'productName', ii.product_name,
-                   'productCode', ii.product_code,
+                   'productName', COALESCE(p.name, 'Unknown Product'),
+                   'productCode', NULL,
                    'quantity', ii.quantity,
                    'unitPrice', ii.unit_price,
                    'totalPrice', ii.total_price,
-                   'discount', ii.discount,
-                   'taxAmount', ii.tax_amount
+                   'discount', 0,
+                   'taxAmount', 0
                  )
                ) as items
         FROM historical_invoices i
         LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+        LEFT JOIN products p ON ii.product_id = p.id
         GROUP BY i.id
         ORDER BY i.invoice_date DESC
         LIMIT $1
@@ -253,17 +255,18 @@ export class InvoiceRepository {
                    'id', ii.id,
                    'invoiceId', ii.invoice_id,
                    'productId', ii.product_id,
-                   'productName', ii.product_name,
-                   'productCode', ii.product_code,
+                   'productName', COALESCE(p.name, 'Unknown Product'),
+                   'productCode', NULL,
                    'quantity', ii.quantity,
                    'unitPrice', ii.unit_price,
                    'totalPrice', ii.total_price,
-                   'discount', ii.discount,
-                   'taxAmount', ii.tax_amount
+                   'discount', 0,
+                   'taxAmount', 0
                  )
                ) as items
         FROM historical_invoices i
         LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+        LEFT JOIN products p ON ii.product_id = p.id
         WHERE i.id = $1
         GROUP BY i.id
       `;

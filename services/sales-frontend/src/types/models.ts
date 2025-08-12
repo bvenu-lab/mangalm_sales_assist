@@ -17,6 +17,10 @@ export interface Store {
   notes?: string;
   createdAt: string;
   updatedAt?: string;
+  // Statistics fields
+  orderCount?: number;
+  lastOrderDate?: string;
+  totalRevenue?: number;
 }
 
 export interface Product {

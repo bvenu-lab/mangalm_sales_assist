@@ -43,14 +43,7 @@ if %ERRORLEVEL% EQU 0 (
     )
 )
 
-REM Kill any remaining node processes (optional)
-choice /C YN /T 5 /D N /M "Kill all Node.js processes?"
-if %ERRORLEVEL% EQU 1 (
-    taskkill /F /IM node.exe >nul 2>&1
-    if !ERRORLEVEL! EQU 0 (
-        echo [OK] All Node.js processes stopped
-    )
-)
+REM Note: Removed global Node.js kill to prevent closing other applications
 
 echo.
 echo ========================================

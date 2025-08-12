@@ -262,3 +262,13 @@ CON
 PRN
 AUX
 NUL
+
+# Microsoft Office temporary files
+~$*
+*.tmp
+*.temp
+~*.tmp
+~*.docx
+~*.xlsx
+~*.pptx
+.~lock.*

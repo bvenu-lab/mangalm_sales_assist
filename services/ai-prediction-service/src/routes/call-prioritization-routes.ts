@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { invoiceAnalyzer } from '../services/invoice-analyzer';
+import { callPrioritizationRepository } from '../database/call-prioritization-repository';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -10,6 +11,26 @@ router.get('/', async (req: Request, res: Response) => {
     const { storeId, limit, offset } = req.query;
     const limitNum = limit ? parseInt(limit as string) : 20;
     const offsetNum = offset ? parseInt(offset as string) : 0;
+    
+    // First try to get from database
+    try {
+      const dbResult = await callPrioritizationRepository.getAll({
+        storeId: storeId as string,
+        limit: limitNum,
+        offset: offsetNum
+      });
+      
+      if (dbResult.data.length > 0) {
+        logger.info(`Retrieved ${dbResult.data.length} call prioritizations from database`);
+        return res.json({
+          success: true,
+          data: dbResult.data,
+          total: dbResult.total
+        });
+      }
+    } catch (dbError) {
+      logger.warn('Failed to fetch from database, falling back to invoice analyzer', dbError);
+    }
     
     let callList: any[] = [];
     

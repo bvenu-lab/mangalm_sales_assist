@@ -7,6 +7,8 @@ import { createAuthRoutes } from '../auth/auth-routes';
 import { createCorsConfig } from '../security/cors-config';
 import { setupEnterpriseApi } from '../api/enterprise-api-integration';
 import { createDashboardRoutes } from '../routes/dashboard-routes';
+import { createPerformanceRoutes } from '../routes/performance-routes';
+import { createUpsellingRoutes } from '../routes/upselling-routes';
 import { storeRoutes } from '../routes/store-routes';
 import { productRoutes } from '../routes/product-routes';
 import { logger } from '../utils/logger';
@@ -55,6 +57,14 @@ export class APIGateway {
     const dashboardRouter = createDashboardRoutes();
     this.app.use('/api', this.authService.authenticate, dashboardRouter);
     
+    // Setup performance routes
+    const performanceRouter = createPerformanceRoutes();
+    this.app.use('/api/sales-agent-performance', this.authService.authenticate, performanceRouter);
+    
+    // Setup upselling routes
+    const upsellingRouter = createUpsellingRoutes();
+    this.app.use('/api/upselling', this.authService.authenticate, upsellingRouter);
+    
     // Setup store routes with real database connection
     this.app.use('/api', this.authService.authenticate, storeRoutes);
     
@@ -63,6 +73,10 @@ export class APIGateway {
     
     logger.info('Dashboard routes initialized', {
       endpoints: ['/api/calls/prioritized', '/api/stores/recent', '/api/orders/pending', '/api/performance/summary']
+    });
+    
+    logger.info('Performance routes initialized', {
+      endpoints: ['/api/sales-agent-performance/:period', '/api/sales-agent-performance/metric/:metric', '/api/sales-agent-performance/summary/overview']
     });
     
     logger.info('Store routes initialized', {

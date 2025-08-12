@@ -185,11 +185,24 @@ export class ApiGatewayClient {
    * Get store by ID
    */
   public async getStoreById(id: string): Promise<any> {
+    console.log(`[Data] Fetching store with ID: ${id}`);
     try {
       const response = await this.client.get(`/api/stores/${id}`);
+      console.log(`[Data] Store API raw response:`, JSON.stringify(response.data));
+      
+      // Check if we have a success/data wrapper
+      if (response.data && response.data.success && response.data.data) {
+        console.log(`[Data] Extracting from success/data wrapper`);
+        const storeData = response.data.data;
+        console.log(`[Data] Extracted store data:`, JSON.stringify(storeData));
+        return storeData;
+      }
+      
+      // Otherwise return the response as is
+      console.log(`[Data] Returning response as is:`, JSON.stringify(response.data));
       return response.data;
     } catch (error) {
-      console.error(`Get store ${id} error:`, error);
+      console.error(`[Data] Failed to fetch store ${id}:`, error);
       throw error;
     }
   }
@@ -554,6 +567,7 @@ export class ApiGatewayClient {
    * Generic GET request
    */
   public async get(url: string, params?: any): Promise<any> {
+    console.log(`[API Gateway] GET ${url} with params:`, params);
     try {
       const response = await this.client.get(url, { params });
       return response.data;

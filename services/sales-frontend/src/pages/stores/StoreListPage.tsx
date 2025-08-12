@@ -326,6 +326,7 @@ const StoreListPage: React.FC = () => {
                 <TableCell><Typography variant="subtitle2">Location</Typography></TableCell>
                 <TableCell><Typography variant="subtitle2">Contact Person</Typography></TableCell>
                 <TableCell><Typography variant="subtitle2">Phone</Typography></TableCell>
+                <TableCell align="center"><Typography variant="subtitle2">Orders</Typography></TableCell>
                 <TableCell><Typography variant="subtitle2">Last Order</Typography></TableCell>
                 <TableCell align="right"><Typography variant="subtitle2">Actions</Typography></TableCell>
               </TableRow>
@@ -333,7 +334,7 @@ const StoreListPage: React.FC = () => {
             <TableBody>
               {filteredStores.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography variant="body1" py={3}>
                       No stores found. Try a different search term or filter.
                     </Typography>
@@ -388,10 +389,21 @@ const StoreListPage: React.FC = () => {
                           </Typography>
                         </Box>
                       </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2" fontWeight={store.orderCount ? "medium" : "normal"}>
+                          {store.orderCount || 0}
+                        </Typography>
+                      </TableCell>
                       <TableCell>
-                        {/* Last order date would come from historical invoices */}
-                        <Typography variant="body2" color="text.secondary">
-                          No data available
+                        <Typography variant="body2" color={store.lastOrderDate ? "text.primary" : "text.secondary"}>
+                          {store.lastOrderDate 
+                            ? new Date(store.lastOrderDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })
+                            : 'No orders yet'
+                          }
                         </Typography>
                       </TableCell>
                       <TableCell align="right">

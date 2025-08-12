@@ -9,10 +9,16 @@ export interface Store {
   state?: string;
   region?: string;
   phone?: string;
+  email?: string;
   contactPerson?: string;
   storeSize?: string;
+  callFrequency?: string;
   createdAt: Date;
   updatedAt?: Date;
+  // Statistics fields
+  orderCount?: number;
+  lastOrderDate?: Date;
+  totalRevenue?: number;
 }
 
 export class StoreRepository {
@@ -28,8 +34,17 @@ export class StoreRepository {
     sortOrder?: 'asc' | 'desc';
   }): Promise<{ data: Store[]; total: number }> {
     try {
-      let query = 'SELECT * FROM stores WHERE 1=1';
-      let countQuery = 'SELECT COUNT(*) FROM stores WHERE 1=1';
+      let query = `
+        SELECT 
+          s.*,
+          COUNT(hi.id) as order_count,
+          MAX(hi.invoice_date) as last_order_date,
+          SUM(hi.total_amount) as total_revenue
+        FROM stores s
+        LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+        WHERE 1=1
+      `;
+      let countQuery = 'SELECT COUNT(DISTINCT s.id) FROM stores s WHERE 1=1';
       const queryParams: any[] = [];
       const countParams: any[] = [];
       let paramIndex = 1;
@@ -37,9 +52,9 @@ export class StoreRepository {
       // Add search filter
       if (params?.search) {
         const searchCondition = ` AND (
-          LOWER(name) LIKE $${paramIndex} OR 
-          LOWER(COALESCE(city, '')) LIKE $${paramIndex} OR 
-          LOWER(COALESCE(state, '')) LIKE $${paramIndex}
+          LOWER(s.name) LIKE $${paramIndex} OR 
+          LOWER(COALESCE(s.city, '')) LIKE $${paramIndex} OR 
+          LOWER(COALESCE(s.state, '')) LIKE $${paramIndex}
         )`;
         query += searchCondition;
         countQuery += searchCondition;
@@ -51,17 +66,22 @@ export class StoreRepository {
 
       // Add region filter (using state column)
       if (params?.region && params.region !== 'all') {
-        query += ` AND state = $${paramIndex}`;
-        countQuery += ` AND state = $${paramIndex}`;
+        query += ` AND s.state = $${paramIndex}`;
+        countQuery += ` AND s.state = $${paramIndex}`;
         queryParams.push(params.region);
         countParams.push(params.region);
         paramIndex++;
       }
 
+      // Add GROUP BY before sorting
+      query += ` GROUP BY s.id`;
+      
       // Add sorting
-      const sortBy = params?.sortBy || 'created_at';
+      const sortBy = params?.sortBy || 's.created_at';
       const sortOrder = params?.sortOrder || 'desc';
-      query += ` ORDER BY ${sortBy} ${sortOrder.toUpperCase()}`;
+      // Adjust sort field to include table prefix
+      const adjustedSortBy = sortBy.includes('.') ? sortBy : `s.${sortBy}`;
+      query += ` ORDER BY ${adjustedSortBy} ${sortOrder.toUpperCase()}`;
 
       // Add pagination
       if (params?.limit) {
@@ -80,6 +100,13 @@ export class StoreRepository {
         db.query(query, queryParams),
         db.query(countQuery, countParams)
       ]);
+
+      logger.info('Store query executed', {
+        query: query.substring(0, 200),
+        params: queryParams,
+        rowCount: dataResult.rowCount,
+        firstRow: dataResult.rows[0]
+      });
 
       const stores = dataResult.rows.map(this.mapRowToStore);
       const total = parseInt(countResult.rows[0].count, 10);
@@ -222,18 +249,41 @@ export class StoreRepository {
    * Map database row to Store object
    */
   private mapRowToStore(row: any): Store {
+    // Parse order statistics - PostgreSQL returns these as strings
+    const orderCount = row.order_count ? parseInt(row.order_count, 10) : 0;
+    const totalRevenue = row.total_revenue ? parseFloat(row.total_revenue) : 0;
+    
+    // Log the mapping for debugging
+    if (row.order_count !== undefined) {
+      logger.info('Mapping store statistics', {
+        id: row.id,
+        name: row.name,
+        raw_order_count: row.order_count,
+        parsed_order_count: orderCount,
+        raw_total_revenue: row.total_revenue,
+        parsed_total_revenue: totalRevenue,
+        last_order_date: row.last_order_date
+      });
+    }
+    
     return {
       id: row.id,
       name: row.name,
       address: row.address,
       city: row.city,
       state: row.state,
-      region: row.state, // Map state to region for compatibility
+      region: row.state || row.sales_region, // Map state to region for compatibility
       phone: row.phone,
-      contactPerson: row.contact_person,
-      storeSize: row.store_size,
+      email: row.email || `store${row.id}@example.com`, // Generate default email if missing
+      contactPerson: row.primary_contact_name || row.contact_person || 'Store Manager',
+      storeSize: row.store_size || row.size || 'Medium',
+      callFrequency: row.call_frequency || 'Weekly',
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      // Add new statistics fields with proper parsing
+      orderCount: orderCount,
+      lastOrderDate: row.last_order_date,
+      totalRevenue: totalRevenue
     };
   }
 }
