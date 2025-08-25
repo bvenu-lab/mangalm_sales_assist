@@ -9,8 +9,13 @@ import { setupEnterpriseApi } from '../api/enterprise-api-integration';
 import { createDashboardRoutes } from '../routes/dashboard-routes';
 import { createPerformanceRoutes } from '../routes/performance-routes';
 import { createUpsellingRoutes } from '../routes/upselling-routes';
+import { createAnalyticsRoutes } from '../routes/analytics-routes';
 import { storeRoutes } from '../routes/store-routes';
 import { productRoutes } from '../routes/product-routes';
+import { orderRoutes } from '../routes/order-routes';
+import { documentRoutes } from '../routes/document-routes';
+import { testUploadRoutes } from '../routes/test-upload-routes';
+import { productAlertsRoutes } from '../routes/product-alerts-routes';
 import { logger } from '../utils/logger';
 import { PortManager } from '../utils/port-manager';
 
@@ -34,6 +39,10 @@ export class APIGateway {
   constructor() {
     this.app = express();
     this.setupMiddleware();
+    
+    // Set up test routes BEFORE authentication
+    this.app.use('/test', testUploadRoutes);
+    
     this.setupAuthentication();
     this.setupEnterpriseApi();
     this.setupRoutes();
@@ -53,6 +62,12 @@ export class APIGateway {
                   '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/auth/health']
     });
     
+    // Setup document routes FIRST (WITHOUT auth for public uploads)
+    this.app.use('/api/documents', documentRoutes);
+    logger.info('Document routes initialized (public access)', {
+      endpoints: ['/api/documents/upload', '/api/documents/ocr/process', '/api/documents/ocr/health']
+    });
+    
     // Setup dashboard routes
     const dashboardRouter = createDashboardRoutes();
     this.app.use('/api', this.authService.authenticate, dashboardRouter);
@@ -65,11 +80,31 @@ export class APIGateway {
     const upsellingRouter = createUpsellingRoutes();
     this.app.use('/api/upselling', this.authService.authenticate, upsellingRouter);
     
+    // Setup analytics routes
+    const analyticsRouter = createAnalyticsRoutes();
+    this.app.use('/api/analytics', this.authService.authenticate, analyticsRouter);
+    
+    // Setup dashboard routes with real database connection
+    const dashboardRoutes = createDashboardRoutes();
+    // Mount public endpoints first (no auth)
+    this.app.get('/api/orders/recent-public', (req: any, res: any, next: any) => {
+      // Pass through to dashboard routes without auth
+      dashboardRoutes(req, res, next);
+    });
+    // Mount authenticated routes
+    this.app.use('/api', this.authService.authenticate, dashboardRoutes);
+    
     // Setup store routes with real database connection
     this.app.use('/api', this.authService.authenticate, storeRoutes);
     
     // Setup product routes with real database connection
     this.app.use('/api', this.authService.authenticate, productRoutes);
+    
+    // Setup order routes with real database connection
+    this.app.use('/api', this.authService.authenticate, orderRoutes);
+    
+    // Setup product alerts routes
+    this.app.use('/api', this.authService.authenticate, productAlertsRoutes);
     
     logger.info('Dashboard routes initialized', {
       endpoints: ['/api/calls/prioritized', '/api/stores/recent', '/api/orders/pending', '/api/performance/summary']
@@ -85,6 +120,10 @@ export class APIGateway {
     
     logger.info('Product routes initialized', {
       endpoints: ['/api/products', '/api/products/:id', '/api/products/categories', '/api/products/brands']
+    });
+    
+    logger.info('Order routes initialized', {
+      endpoints: ['/api/orders', '/api/orders/:id', '/api/orders/generate', '/api/orders/:id/confirm', '/api/orders/:id/reject', '/api/orders/analytics']
     });
   }
 
@@ -150,6 +189,17 @@ export class APIGateway {
       // Note: Authentication is handled internally by SimpleAuth, not proxied
       // The /api/auth and /auth routes are configured in setupAuthentication()
 
+      // Document Processor Service - Handled directly in gateway for now
+      // {
+      //   path: '/api/documents',
+      //   target: 'http://localhost:3010',
+      //   auth: true,
+      //   rateLimit: {
+      //     windowMs: 60 * 1000, // 1 minute
+      //     max: 10 // 10 uploads per minute
+      //   }
+      // },
+      
       // AI Prediction Service
       {
         path: '/api/predictions',
@@ -189,11 +239,12 @@ export class APIGateway {
         target: 'http://localhost:3006',
         auth: true
       },
-      {
-        path: '/api/orders',
-        target: 'http://localhost:3006',
-        auth: true
-      },
+      // Orders are now handled directly by API Gateway with database connection
+      // {
+      //   path: '/api/orders',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
       {
         path: '/mangalm/predicted-orders',
         target: 'http://localhost:3006',
@@ -230,6 +281,7 @@ export class APIGateway {
         auth: true,
         roles: ['admin', 'project_manager']
       },
+
 
       // Zoho Integration (when available)
       {
@@ -287,7 +339,7 @@ export class APIGateway {
         legacyHeaders: false
       });
       
-      this.app.use(routePath, limiter);
+      this.app.use(routePath, limiter as any);
     }
 
     // Apply authentication if required
@@ -376,7 +428,8 @@ export class APIGateway {
     return {
       'ai-prediction': { url: 'http://localhost:3006', status: 'unknown' },
       'pm-orchestrator': { url: 'http://localhost:3003', status: 'unknown' },
-      'zoho-integration': { url: 'http://localhost:3002', status: 'unknown' }
+      'zoho-integration': { url: 'http://localhost:3002', status: 'unknown' },
+      'document-processor': { url: 'http://localhost:3010', status: 'unknown' }
     };
   }
 

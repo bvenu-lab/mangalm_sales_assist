@@ -1,7 +1,7 @@
 import { APIGateway } from './gateway/api-gateway';
 import { logger } from './utils/logger';
 
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3007;
 
 // Initialize API Gateway
 const gateway = new APIGateway();

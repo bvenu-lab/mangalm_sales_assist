@@ -279,5 +279,31 @@ export function createUpsellingRoutes(): Router {
     }
   });
 
+  // Get upselling suggestions history
+  router.get('/suggestions/history', async (req: Request, res: Response) => {
+    try {
+      logger.info('Fetching upselling suggestions history');
+      
+      // Return mock data for now - this would be replaced with actual database query
+      const mockHistory = {
+        success: true,
+        data: {
+          suggestions: [],
+          total: 0,
+          page: 1,
+          limit: 10
+        }
+      };
+      
+      res.json(mockHistory);
+    } catch (error) {
+      logger.error('Error fetching upselling suggestions history', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch upselling suggestions history'
+      });
+    }
+  });
+
   return router;
 }

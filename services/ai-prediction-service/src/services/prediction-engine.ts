@@ -51,7 +51,7 @@ export class PredictionEngine {
       const storesResult = await db.query(storesQuery, storeId ? [storeId] : []);
 
       for (const row of storesResult.rows) {
-        await this.generateStorePredicti ons(row.store_id, {
+        await this.generateStorePredictions(row.store_id, {
           lookbackMonths,
           forecastDays,
           minConfidence,

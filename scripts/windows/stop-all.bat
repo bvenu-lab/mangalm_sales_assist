@@ -9,7 +9,7 @@ echo.
 REM Kill Node.js processes on specific ports
 echo Stopping services...
 
-set PORTS=3000 3001 3002 3003 3004 3005 3006 3007
+set PORTS=3000 3001 3002 3003 3004 3005 3006 3007 3010
 set FOUND=0
 
 for %%p in (%PORTS%) do (

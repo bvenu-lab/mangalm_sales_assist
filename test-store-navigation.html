@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Store Navigation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .error {
+            color: red;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .store-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .store-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .store-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .store-details {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Store Navigation</h1>
+    
+    <div class="container">
+        <h2>1. Test Prioritized Calls API</h2>
+        <button onclick="testPrioritizedCalls()">Fetch Prioritized Calls</button>
+        <div id="calls-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Test Store Details API</h2>
+        <input type="text" id="store-id" placeholder="Enter Store ID" style="padding: 8px; margin-right: 10px;">
+        <button onclick="testStoreDetails()">Fetch Store Details</button>
+        <div id="store-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. Test Navigation Flow</h2>
+        <button onclick="testFullFlow()">Test Complete Flow</button>
+        <div id="flow-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        
+        // Get auth token from localStorage or use test token
+        const getAuthToken = () => {
+            return localStorage.getItem('auth_token') || 'test-token';
+        };
+
+        async function testPrioritizedCalls() {
+            const resultDiv = document.getElementById('calls-result');
+            resultDiv.innerHTML = '<p>Loading...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/calls/prioritized?limit=5`, {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    let html = '<div class="success">Success! Found ' + data.data.length + ' prioritized calls</div>';
+                    html += '<div class="store-list">';
+                    
+                    data.data.forEach(call => {
+                        html += `
+                            <div class="store-card">
+                                <h3>${call.store?.name || 'Unknown Store'}</h3>
+                                <div class="store-details">Store ID: ${call.storeId || call.store_id}</div>
+                                <div class="store-details">Priority Score: ${call.priorityScore || call.priority_score}</div>
+                                <div class="store-details">Reason: ${call.priorityReason || call.priority_reason}</div>
+                                <button onclick="testStoreDetails('${call.storeId || call.store_id}')">
+                                    View Store Details
+                                </button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    html += '<h3>Raw Response:</h3>';
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">Failed to fetch calls: ' + (data.error || 'Unknown error') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testStoreDetails(storeId) {
+            if (!storeId) {
+                storeId = document.getElementById('store-id').value;
+            }
+            
+            if (!storeId) {
+                alert('Please enter a store ID');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('store-result');
+            resultDiv.innerHTML = '<p>Loading store ' + storeId + '...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/stores/${storeId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    let html = '<div class="success">Successfully fetched store details!</div>';
+                    html += `
+                        <div class="store-card">
+                            <h3>${data.data.name}</h3>
+                            <div class="store-details">ID: ${data.data.id}</div>
+                            <div class="store-details">City: ${data.data.city || 'N/A'}</div>
+                            <div class="store-details">Region: ${data.data.region || data.data.state || 'N/A'}</div>
+                            <div class="store-details">Phone: ${data.data.phone || 'N/A'}</div>
+                            <div class="store-details">Email: ${data.data.email || 'N/A'}</div>
+                        </div>
+                    `;
+                    html += '<h3>Raw Response:</h3>';
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    resultDiv.innerHTML = html;
+                    
+                    // Also update the store ID input
+                    document.getElementById('store-id').value = storeId;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">Failed to fetch store: ' + (data.error || 'Unknown error') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testFullFlow() {
+            const resultDiv = document.getElementById('flow-result');
+            resultDiv.innerHTML = '<p>Testing full navigation flow...</p>';
+            
+            try {
+                // Step 1: Get prioritized calls
+                resultDiv.innerHTML += '<p>Step 1: Fetching prioritized calls...</p>';
+                const callsResponse = await fetch(`${API_BASE}/api/calls/prioritized?limit=1`, {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const callsData = await callsResponse.json();
+                
+                if (!callsData.success || !callsData.data || callsData.data.length === 0) {
+                    throw new Error('No prioritized calls found');
+                }
+                
+                const firstCall = callsData.data[0];
+                const storeId = firstCall.storeId || firstCall.store_id;
+                
+                resultDiv.innerHTML += '<div class="success">✓ Found store ID: ' + storeId + '</div>';
+                
+                // Step 2: Fetch store details
+                resultDiv.innerHTML += '<p>Step 2: Fetching store details for ID: ' + storeId + '...</p>';
+                const storeResponse = await fetch(`${API_BASE}/api/stores/${storeId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const storeData = await storeResponse.json();
+                
+                if (!storeData.success || !storeData.data) {
+                    throw new Error('Failed to fetch store details');
+                }
+                
+                resultDiv.innerHTML += '<div class="success">✓ Successfully fetched store: ' + storeData.data.name + '</div>';
+                
+                // Show navigation URL
+                const navigationUrl = `http://localhost:3000/stores/${storeId}`;
+                resultDiv.innerHTML += `
+                    <div class="success">
+                        <h3>Navigation Test Complete!</h3>
+                        <p>The navigation would go to: <a href="${navigationUrl}" target="_blank">${navigationUrl}</a></p>
+                        <p>Store Name: ${storeData.data.name}</p>
+                        <p>Store ID: ${storeId}</p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML += '<div class="error">Flow test failed: ' + error.message + '</div>';
+            }
+        }
+
+        // Test on page load
+        window.onload = () => {
+            console.log('Page loaded. Auth token:', getAuthToken() ? 'Present' : 'Missing');
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+substitutions:
+  _REGION: us-west1
+  _REPO: mangalm-services
+  _ENV: production
+
+steps:
+  # Build and deploy Sales Frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA',
+           '-f', 'services/sales-frontend/Dockerfile',
+           './services/sales-frontend']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA']
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-sales-frontend',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated=true',
+       '--port', '3000',
+       '--cpu', '1',
+       '--memory', '512Mi',
+       '--concurrency', '80',
+       '--min-instances', '0',
+       '--max-instances', '10',
+       '--set-env-vars', 'REACT_APP_API_GATEWAY_URL=https://mangalm-api-gateway-${_ENV}.run.app']
+
+  # Build and deploy API Gateway
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA',
+           '-f', 'services/api-gateway/Dockerfile',
+           './services/api-gateway']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA']
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-api-gateway',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated=false',
+       '--port', '3007',
+       '--cpu', '2',
+       '--memory', '1Gi',
+       '--concurrency', '100',
+       '--min-instances', '1',
+       '--max-instances', '50']
+
+  # Build and deploy AI Prediction Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA',
+           '-f', 'services/ai-prediction-service/Dockerfile',
+           './services/ai-prediction-service']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA']
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-ai-prediction',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated=false',
+       '--port', '3006',
+       '--cpu', '2',
+       '--memory', '2Gi',
+       '--concurrency', '50',
+       '--min-instances', '0',
+       '--max-instances', '20']
+
+  # Build and deploy Zoho Integration Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
+           '-f', 'services/zoho-integration/Dockerfile',
+           './services/zoho-integration']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA']
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-zoho-integration',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated=false',
+       '--port', '3005',
+       '--cpu', '1',
+       '--memory', '1Gi',
+       '--concurrency', '50',
+       '--min-instances', '0',
+       '--max-instances', '10']
+
+  # Build and deploy Document Processor Service
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
+           '-f', 'services/document-processor/Dockerfile',
+           './services/document-processor']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA']
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-document-processor',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated=false',
+       '--port', '3008',
+       '--cpu', '2',
+       '--memory', '2Gi',
+       '--concurrency', '20',
+       '--min-instances', '0',
+       '--max-instances', '10']
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA'
+
+timeout: 1800s

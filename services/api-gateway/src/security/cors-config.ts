@@ -15,6 +15,11 @@ export function createCorsConfig() {
         return callback(null, true);
       }
 
+      // Allow 'null' origin for local file testing
+      if (origin === 'null') {
+        return callback(null, true);
+      }
+
       // In development, allow localhost variations
       if (isDevelopment) {
         const isLocalhost = origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
@@ -30,7 +35,8 @@ export function createCorsConfig() {
         'http://localhost:8080',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3005',
-        'http://127.0.0.1:8080'
+        'http://127.0.0.1:8080',
+        'file://'
       ];
 
       if (allowedOrigins.includes(origin)) {

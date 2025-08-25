@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="haha">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Upload & Tracking Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 200px;
+            font-family: monospace;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: transform 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .link-list {
+            list-style: none;
+            padding: 0;
+        }
+        .link-list li {
+            margin: 10px 0;
+        }
+        .link-list a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .link-list a:hover {
+            background: #e0e0e0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Mangalm Order Upload & Tracking Test</h1>
+        
+        <div class="section">
+            <h2>📄 Create Test Order</h2>
+            <div class="form-group">
+                <label for="storeSelect">Select Store:</label>
+                <select id="storeSelect">
+                    <option value="4261931000001048015">Rajesh Stores - Delhi</option>
+                    <option value="4261931000007265591">Mumbai Central Store</option>
+                    <option value="4261931000008433292">Bangalore South Store</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="orderContent">Order Content:</label>
+                <textarea id="orderContent">MANGALM FOODS
+Order Invoice
+
+Date: ${new Date().toLocaleDateString()}
+Time: ${new Date().toLocaleTimeString()}
+
+ITEMS:
+1. Samosa (200 pieces) @ Rs.12/piece = Rs.2400
+2. Kachori (100 pieces) @ Rs.15/piece = Rs.1500  
+3. Dhokla (10 kg) @ Rs.180/kg = Rs.1800
+4. Jalebi (5 kg) @ Rs.240/kg = Rs.1200
+
+Subtotal: Rs.6900
+GST (18%): Rs.1242
+Total: Rs.8142
+
+Customer: Test Customer
+Phone: 9876543210
+Delivery: Next Day</textarea>
+            </div>
+            <button onclick="uploadOrder()">📤 Upload Order</button>
+            <button onclick="generateRandomOrder()">🎲 Generate Random Order</button>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Order Tracking</h2>
+            <button onclick="checkDatabase()">🔍 Check Database</button>
+            <button onclick="checkStoreOrders()">🏪 Check Store Orders</button>
+            <button onclick="checkDashboard()">📈 Check Dashboard</button>
+            <button onclick="runFullTest()">🧪 Run Full Test</button>
+            <div id="trackingResults" class="results" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>📈 Statistics</h2>
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalOrders">-</div>
+                    <div class="stat-label">Total Orders</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="documentOrders">-</div>
+                    <div class="stat-label">Document Orders</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="todayOrders">-</div>
+                    <div class="stat-label">Today's Orders</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="lastUpload">-</div>
+                    <div class="stat-label">Last Upload</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔗 Quick Links</h2>
+            <ul class="link-list">
+                <li><a href="http://localhost:3000/dashboard" target="_blank">📊 Dashboard</a></li>
+                <li><a href="http://localhost:3000/stores/4261931000001048015" target="_blank">🏪 Rajesh Stores Page</a></li>
+                <li><a href="http://localhost:3000/documents" target="_blank">📄 Documents Page</a></li>
+                <li><a href="http://localhost:3007/api/orders/recent?limit=10" target="_blank">🔄 Recent Orders API</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let lastOrderId = null;
+        let uploadCount = 0;
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('uploadStatus');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            status.style.display = 'block';
+        }
+
+        function showResults(data) {
+            const results = document.getElementById('trackingResults');
+            results.textContent = JSON.stringify(data, null, 2);
+            results.style.display = 'block';
+        }
+
+        async function uploadOrder() {
+            const storeId = document.getElementById('storeSelect').value;
+            const content = document.getElementById('orderContent').value;
+            
+            showStatus('Uploading order...', 'info');
+            
+            try {
+                const formData = new FormData();
+                const blob = new Blob([content], { type: 'text/plain' });
+                formData.append('file', blob, `order-${Date.now()}.txt`);
+                formData.append('storeId', storeId);
+                formData.append('documentType', 'order');
+
+                const response = await fetch('http://localhost:3007/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    uploadCount++;
+                    lastOrderId = data.data?.orderId;
+                    showStatus(`✅ Order uploaded successfully! Order ID: ${lastOrderId}`, 'success');
+                    updateStats();
+                } else {
+                    showStatus(`❌ Upload failed: ${data.message}`, 'error');
+                }
+                
+                showResults(data);
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function generateRandomOrder() {
+            const items = [
+                { name: 'Samosa', price: 12, unit: 'pieces' },
+                { name: 'Kachori', price: 15, unit: 'pieces' },
+                { name: 'Dhokla', price: 180, unit: 'kg' },
+                { name: 'Jalebi', price: 240, unit: 'kg' },
+                { name: 'Bhel Puri', price: 280, unit: 'kg' },
+                { name: 'Sev Puri', price: 25, unit: 'plates' },
+                { name: 'Pani Puri', price: 30, unit: 'plates' }
+            ];
+            
+            let orderText = `MANGALM FOODS\nOrder Invoice\n\n`;
+            orderText += `Date: ${new Date().toLocaleDateString()}\n`;
+            orderText += `Time: ${new Date().toLocaleTimeString()}\n\n`;
+            orderText += `ITEMS:\n`;
+            
+            let subtotal = 0;
+            const numItems = Math.floor(Math.random() * 4) + 2;
+            
+            for (let i = 0; i < numItems; i++) {
+                const item = items[Math.floor(Math.random() * items.length)];
+                const qty = Math.floor(Math.random() * 50) + 10;
+                const total = qty * item.price;
+                subtotal += total;
+                orderText += `${i+1}. ${item.name} (${qty} ${item.unit}) @ Rs.${item.price}/${item.unit.slice(0,-1)} = Rs.${total}\n`;
+            }
+            
+            const gst = Math.round(subtotal * 0.18);
+            const total = subtotal + gst;
+            
+            orderText += `\nSubtotal: Rs.${subtotal}\n`;
+            orderText += `GST (18%): Rs.${gst}\n`;
+            orderText += `Total: Rs.${total}\n\n`;
+            orderText += `Customer: Customer ${Math.floor(Math.random() * 1000)}\n`;
+            orderText += `Phone: 98765${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}\n`;
+            orderText += `Delivery: ${Math.random() > 0.5 ? 'Next Day' : 'Same Day'}`;
+            
+            document.getElementById('orderContent').value = orderText;
+            showStatus('Random order generated!', 'success');
+        }
+
+        async function checkDatabase() {
+            showStatus('Checking database...', 'info');
+            try {
+                const response = await fetch('http://localhost:3007/api/orders/recent?limit=5');
+                const data = await response.json();
+                showResults(data);
+                showStatus(`Found ${data.length || 0} recent orders in database`, 'success');
+            } catch (error) {
+                showStatus(`Error checking database: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkStoreOrders() {
+            const storeId = document.getElementById('storeSelect').value;
+            showStatus('Checking store orders...', 'info');
+            try {
+                const response = await fetch(`http://localhost:3007/api/orders/recent?store_id=${storeId}&limit=5`);
+                const data = await response.json();
+                showResults(data);
+                showStatus(`Found ${data.length || 0} orders for selected store`, 'success');
+            } catch (error) {
+                showStatus(`Error checking store orders: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkDashboard() {
+            showStatus('Checking dashboard...', 'info');
+            try {
+                const response = await fetch('http://localhost:3007/api/dashboard/summary');
+                const data = await response.json();
+                showResults(data);
+                showStatus('Dashboard data retrieved successfully', 'success');
+            } catch (error) {
+                showStatus(`Error checking dashboard: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFullTest() {
+            showStatus('Running full test...', 'info');
+            
+            // Step 1: Upload
+            await uploadOrder();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Step 2: Check database
+            await checkDatabase();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Step 3: Check store
+            await checkStoreOrders();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Step 4: Check dashboard
+            await checkDashboard();
+            
+            showStatus('✅ Full test completed! Check results above.', 'success');
+        }
+
+        async function updateStats() {
+            try {
+                // Get total orders
+                const response = await fetch('http://localhost:3007/api/orders/recent?limit=100');
+                const orders = await response.json();
+                
+                document.getElementById('totalOrders').textContent = orders.length || 0;
+                
+                // Count document orders
+                const documentOrders = orders.filter(o => o.source === 'document').length;
+                document.getElementById('documentOrders').textContent = documentOrders;
+                
+                // Count today's orders
+                const today = new Date().toDateString();
+                const todayOrders = orders.filter(o => 
+                    new Date(o.created_at).toDateString() === today
+                ).length;
+                document.getElementById('todayOrders').textContent = todayOrders;
+                
+                // Last upload time
+                document.getElementById('lastUpload').textContent = 
+                    uploadCount > 0 ? new Date().toLocaleTimeString() : '-';
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+
+        // Update stats on load
+        updateStats();
+        
+        // Auto-refresh stats every 10 seconds
+        setInterval(updateStats, 10000);
+    </script>
+</body>
+</html>

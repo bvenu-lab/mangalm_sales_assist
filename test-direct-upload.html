@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Upload Test - API Gateway</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .error { background: #ffeeee; color: red; }
+        .success { background: #eeffee; color: green; }
+        pre { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Direct Upload Test - API Gateway Port 3007</h1>
+    
+    <div>
+        <h3>Test Configuration:</h3>
+        <p>Upload URL: http://localhost:3007/api/documents/upload</p>
+        <p>This should go through the API Gateway, not directly to document processor</p>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf">
+        <button onclick="uploadFile()">Upload File</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Console Output:</h3>
+        <div id="console" style="background: black; color: lime; padding: 10px; font-family: monospace; height: 300px; overflow-y: auto;"></div>
+    </div>
+
+    <script>
+        const consoleDiv = document.getElementById('console');
+        
+        function log(message, data) {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            const entry = `[${timestamp}] ${message}${data ? '\n' + JSON.stringify(data, null, 2) : ''}`;
+            consoleDiv.innerHTML += entry + '\n\n';
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            console.log(message, data);
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            log('Starting upload', {
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type
+            });
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('priority', '5');
+            formData.append('correlationId', 'test-' + Date.now());
+            
+            try {
+                resultDiv.innerHTML = '<div class="result">Uploading...</div>';
+                log('Sending request to API Gateway...');
+                
+                const response = await fetch('http://localhost:3007/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                log('Response received', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="result success">✅ Success!</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    log('Upload successful', data);
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ Error: ${response.status}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    log('Upload failed', data);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ Network Error: ${error.message}</div>`;
+                log('Network error', {
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
+        }
+        
+        // Test connectivity on page load
+        window.onload = async () => {
+            log('Testing API Gateway connectivity...');
+            try {
+                const response = await fetch('http://localhost:3007/health');
+                const data = await response.json();
+                log('API Gateway health check', data);
+            } catch (error) {
+                log('API Gateway health check failed', {
+                    message: error.message
+                });
+            }
+        };
+    </script>
+</body>
+</html>

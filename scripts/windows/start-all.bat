@@ -208,7 +208,7 @@ echo.
 
 REM Kill any existing Node processes on our ports
 echo Checking for port conflicts...
-for %%p in (3000 3001 3002 3003 3006) do (
+for %%p in (3000 3002 3003 3006 3007 3010) do (
     for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%%p"') do (
         taskkill /F /PID %%a >nul 2>&1
     )
@@ -221,12 +221,12 @@ echo Starting services...
 echo.
 
 REM Start API Gateway
-echo [1/4] Starting API Gateway (Port 3001)...
-start "API Gateway" /D "%PROJECT_ROOT%\services\api-gateway" cmd /k "npm start"
+echo [1/5] Starting API Gateway (Port 3007)...
+start "API Gateway" /D "%PROJECT_ROOT%\services\api-gateway" cmd /k "set PORT=3007 && npm start"
 timeout /t 3 >nul
 
 REM Verify API Gateway started
-curl -s http://localhost:3001/health >nul 2>&1
+curl -s http://localhost:3007/health >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] API Gateway may not have started properly
 ) else (
@@ -234,19 +234,25 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 REM Start AI Prediction Service
-echo [2/4] Starting AI Prediction Service (Port 3006)...
+echo [2/5] Starting AI Prediction Service (Port 3006)...
 start "AI Service" /D "%PROJECT_ROOT%\services\ai-prediction-service" cmd /k "npm start"
 timeout /t 3 >nul
 echo [OK] AI Service started
 
+REM Start Document Processor Service
+echo [3/5] Starting Document Processor Service (Port 3010)...
+start "Document Processor" /D "%PROJECT_ROOT%\services\document-processor" cmd /k "set PORT=3010 && npm start"
+timeout /t 3 >nul
+echo [OK] Document Processor started
+
 REM Start PM Agent Orchestrator
-echo [3/4] Starting PM Agent Orchestrator (Port 3003)...
+echo [4/5] Starting PM Agent Orchestrator (Port 3003)...
 start "PM Orchestrator" /D "%PROJECT_ROOT%\services\pm-agent-orchestrator" cmd /k "npm start"
 timeout /t 3 >nul
 echo [OK] PM Orchestrator started
 
 REM Start Frontend
-echo [4/4] Starting Frontend (Port 3000)...
+echo [5/5] Starting Frontend (Port 3000)...
 start "Frontend" /D "%PROJECT_ROOT%\services\sales-frontend" cmd /k "npm start"
 echo [OK] Frontend starting (this may take a moment)...
 echo.
@@ -263,11 +269,12 @@ echo.
 echo Services are available at:
 echo.
 echo   Frontend:          http://localhost:3000
-echo   API Gateway:       http://localhost:3001
-echo   API Health:        http://localhost:3001/health
-echo   API Docs:          http://localhost:3001/api-docs
+echo   API Gateway:       http://localhost:3007
+echo   API Health:        http://localhost:3007/health
+echo   API Docs:          http://localhost:3007/api-docs
 echo   AI Service:        http://localhost:3006
 echo   PM Orchestrator:   http://localhost:3003
+  echo   Doc Processor:     http://localhost:3010
 echo.
 echo Default Login Credentials:
 echo   Username: demo    Password: demo2025  (Admin)

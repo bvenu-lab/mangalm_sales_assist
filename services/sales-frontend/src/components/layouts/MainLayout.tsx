@@ -19,6 +19,7 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  Button,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -31,6 +32,9 @@ import {
   Logout as LogoutIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
+  Scanner as ScannerIcon,
+  CloudUpload as CloudUploadIcon,
+  TableChart as TableChartIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -100,6 +104,41 @@ const MainLayout: React.FC = () => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => handleNavigation('/documents')}
+            sx={{
+              backgroundColor: theme => theme.palette.mode === 'light' 
+                ? 'rgba(33, 150, 243, 0.08)' 
+                : 'rgba(33, 150, 243, 0.15)',
+              '&:hover': {
+                backgroundColor: theme => theme.palette.mode === 'light'
+                  ? 'rgba(33, 150, 243, 0.12)'
+                  : 'rgba(33, 150, 243, 0.25)',
+              },
+            }}
+          >
+            <ListItemIcon>
+              <ScannerIcon color="primary" />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Scan Orders" 
+              secondary="Upload & Process"
+              primaryTypographyProps={{ fontWeight: 'medium' }}
+            />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => handleNavigation('/bulk-upload')}>
+            <ListItemIcon>
+              <TableChartIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Bulk Upload" 
+              secondary="CSV/XLSX Orders"
+            />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
           <ListItemButton onClick={() => handleNavigation('/stores')}>
             <ListItemIcon>
               <StoreIcon />
@@ -159,6 +198,21 @@ const MainLayout: React.FC = () => {
             {/* Page title could be dynamic based on current route */}
             Sales Assistant Dashboard
           </Typography>
+          <Button
+            color="inherit"
+            startIcon={<CloudUploadIcon />}
+            onClick={() => navigate('/documents')}
+            sx={{ 
+              mr: 2,
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+              }
+            }}
+          >
+            Scan Order
+          </Button>
           <IconButton color="inherit" aria-label="notifications">
             <NotificationsIcon />
           </IconButton>
@@ -198,6 +252,15 @@ const MainLayout: React.FC = () => {
                 <PersonIcon fontSize="small" />
               </ListItemIcon>
               Profile
+            </MenuItem>
+            <MenuItem onClick={() => {
+              handleProfileMenuClose();
+              navigate('/settings');
+            }}>
+              <ListItemIcon>
+                <SettingsIcon fontSize="small" />
+              </ListItemIcon>
+              Settings
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>

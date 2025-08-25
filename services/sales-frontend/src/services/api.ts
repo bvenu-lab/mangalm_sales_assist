@@ -158,5 +158,8 @@ const api = {
   }
 };
 
+// Export the getAuthToken function
+export const getAuthToken = () => apiGatewayClient.getAuthToken();
+
 // Export the API service as default
 export default api;

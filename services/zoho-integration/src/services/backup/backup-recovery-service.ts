@@ -389,7 +389,7 @@ export class BackupRecoveryService extends EventEmitter {
       }
 
       // Step 5: Perform actual restore
-      for (const record of recordsToRestore) {
+      for (let record of recordsToRestore) {
         try {
           // Check for conflicts
           const existingRecord = await this.checkExistingRecord(metadata.module, record.id);

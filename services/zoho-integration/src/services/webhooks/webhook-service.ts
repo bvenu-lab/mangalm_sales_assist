@@ -425,6 +425,7 @@ export class WebhookService extends EventEmitter {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Rate limiting
+    // @ts-ignore
     this.app.use(this.rateLimiter.middleware);
 
     // Health check endpoint

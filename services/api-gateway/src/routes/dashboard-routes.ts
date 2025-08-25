@@ -66,16 +66,16 @@ export function createDashboardRoutes(): Router {
         )
         SELECT 
           ROW_NUMBER() OVER (ORDER BY priority_score DESC) as id,
-          id as store_id,
+          id as "storeId",
           json_build_object(
             'name', name,
             'city', city,
             'region', state
           ) as store,
-          ROUND(priority_score::numeric, 1) as priority_score,
-          priority_reason,
+          ROUND(priority_score::numeric, 1) as "priorityScore",
+          priority_reason as "priorityReason",
           'pending' as status,
-          NOW() as scheduled_date
+          NOW() as "scheduledDate"
         FROM priority_scores
         ORDER BY priority_score DESC
         LIMIT $1
@@ -84,9 +84,16 @@ export function createDashboardRoutes(): Router {
       const params = storeId ? [limit, storeId] : [limit];
       const result = await db.query(query, params);
       
+      // Ensure numeric fields are properly typed
+      const mappedRows = result.rows.map((row: any) => ({
+        ...row,
+        priorityScore: parseFloat(row.priorityScore) || 0,
+        storeId: row.storeId
+      }));
+      
       res.json({
         success: true,
-        data: result.rows,
+        data: mappedRows,
         total: result.rowCount
       });
     } catch (error) {
@@ -185,21 +192,28 @@ export function createDashboardRoutes(): Router {
           FROM store_orders
         )
         SELECT 
-          id as store_id,
+          id as "storeId",
           json_build_object(
             'name', name,
             'city', city,
             'region', state
           ) as store,
-          ROUND(priority_score::numeric, 1) as priority_score,
-          priority_reason
+          ROUND(priority_score::numeric, 1) as "priorityScore",
+          priority_reason as "priorityReason"
         FROM priority_scores
-        WHERE priority_score <= $2 OR $2 = 0
+        WHERE priority_score < $2
         ORDER BY priority_score DESC
         LIMIT 1
       `;
       
       const nextResult = await db.query(nextStoreQuery, [currentStoreId, currentPriority]);
+      
+      logger.info('Next priority query result', {
+        currentStoreId,
+        currentPriority,
+        rowCount: nextResult.rows.length,
+        firstRow: nextResult.rows[0]
+      });
       
       if (nextResult.rows.length > 0) {
         res.json({
@@ -277,6 +291,196 @@ export function createDashboardRoutes(): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to fetch next priority call'
+      });
+    }
+  });
+
+  // Get previous priority call before current store
+  router.get('/calls/previous-priority/:storeId', async (req: Request, res: Response) => {
+    try {
+      const currentStoreId = req.params.storeId;
+      logger.info('Fetching previous priority call before store', { currentStoreId });
+      
+      // Get current store's priority score first
+      const currentStoreQuery = `
+        WITH store_orders AS (
+          SELECT 
+            s.id,
+            MAX(hi.invoice_date) as last_order_date,
+            COUNT(hi.id) as total_orders,
+            AVG(hi.total_amount) as avg_order_value
+          FROM stores s
+          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          WHERE s.id = $1
+          GROUP BY s.id
+        )
+        SELECT 
+          CASE 
+            WHEN last_order_date IS NULL THEN 10.0
+            ELSE LEAST(10.0, EXTRACT(DAY FROM NOW() - last_order_date) / 7.0 * 5.0)
+          END +
+          CASE 
+            WHEN avg_order_value > 50000 THEN 3.0
+            WHEN avg_order_value > 30000 THEN 2.0
+            WHEN avg_order_value > 10000 THEN 1.0
+            ELSE 0.5
+          END +
+          CASE
+            WHEN total_orders > 20 THEN 2.0
+            WHEN total_orders > 10 THEN 1.5
+            WHEN total_orders > 5 THEN 1.0
+            ELSE 0.5
+          END as current_priority
+        FROM store_orders
+      `;
+      
+      const currentResult = await db.query(currentStoreQuery, [currentStoreId]);
+      const currentPriority = currentResult.rows[0]?.current_priority || 0;
+      
+      // Get previous higher priority store (higher score = higher priority)
+      const previousStoreQuery = `
+        WITH store_orders AS (
+          SELECT 
+            s.id,
+            s.name,
+            s.city,
+            s.state,
+            MAX(hi.invoice_date) as last_order_date,
+            COUNT(hi.id) as total_orders,
+            AVG(hi.total_amount) as avg_order_value
+          FROM stores s
+          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          WHERE s.id != $1
+          GROUP BY s.id, s.name, s.city, s.state
+        ),
+        priority_scores AS (
+          SELECT 
+            *,
+            CASE 
+              WHEN last_order_date IS NULL THEN 10.0
+              ELSE LEAST(10.0, EXTRACT(DAY FROM NOW() - last_order_date) / 7.0 * 5.0)
+            END +
+            CASE 
+              WHEN avg_order_value > 50000 THEN 3.0
+              WHEN avg_order_value > 30000 THEN 2.0
+              WHEN avg_order_value > 10000 THEN 1.0
+              ELSE 0.5
+            END +
+            CASE
+              WHEN total_orders > 20 THEN 2.0
+              WHEN total_orders > 10 THEN 1.5
+              WHEN total_orders > 5 THEN 1.0
+              ELSE 0.5
+            END as priority_score,
+            CASE
+              WHEN last_order_date IS NULL THEN 'New customer - never ordered'
+              WHEN EXTRACT(DAY FROM NOW() - last_order_date) > 30 THEN 'Overdue for order'
+              WHEN avg_order_value > 50000 THEN 'High-value customer'
+              WHEN total_orders > 20 THEN 'Regular customer'
+              ELSE 'Standard follow-up'
+            END as priority_reason
+          FROM store_orders
+        )
+        SELECT 
+          id as "storeId",
+          json_build_object(
+            'name', name,
+            'city', city,
+            'region', state
+          ) as store,
+          ROUND(priority_score::numeric, 1) as "priorityScore",
+          priority_reason as "priorityReason"
+        FROM priority_scores
+        WHERE priority_score > $2
+        ORDER BY priority_score DESC
+        LIMIT 1
+      `;
+      
+      const previousResult = await db.query(previousStoreQuery, [currentStoreId, currentPriority]);
+      
+      logger.info('Previous priority query result', {
+        currentStoreId,
+        currentPriority,
+        rowCount: previousResult.rows.length,
+        firstRow: previousResult.rows[0]
+      });
+      
+      if (previousResult.rows.length > 0) {
+        res.json({
+          success: true,
+          data: previousResult.rows[0]
+        });
+      } else {
+        // If no previous store with higher priority, wrap around to the highest priority one
+        const highestQuery = `
+          WITH store_orders AS (
+            SELECT 
+              s.id,
+              s.name,
+              s.city,
+              s.state,
+              MAX(hi.invoice_date) as last_order_date,
+              COUNT(hi.id) as total_orders,
+              AVG(hi.total_amount) as avg_order_value
+            FROM stores s
+            LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+            WHERE s.id != $1
+            GROUP BY s.id, s.name, s.city, s.state
+          ),
+          priority_scores AS (
+            SELECT 
+              *,
+              CASE 
+                WHEN last_order_date IS NULL THEN 10.0
+                ELSE LEAST(10.0, EXTRACT(DAY FROM NOW() - last_order_date) / 7.0 * 5.0)
+              END +
+              CASE 
+                WHEN avg_order_value > 50000 THEN 3.0
+                WHEN avg_order_value > 30000 THEN 2.0
+                WHEN avg_order_value > 10000 THEN 1.0
+                ELSE 0.5
+              END +
+              CASE
+                WHEN total_orders > 20 THEN 2.0
+                WHEN total_orders > 10 THEN 1.5
+                WHEN total_orders > 5 THEN 1.0
+                ELSE 0.5
+              END as priority_score,
+              CASE
+                WHEN last_order_date IS NULL THEN 'New customer - never ordered'
+                WHEN EXTRACT(DAY FROM NOW() - last_order_date) > 30 THEN 'Overdue for order'
+                WHEN avg_order_value > 50000 THEN 'High-value customer'
+                WHEN total_orders > 20 THEN 'Regular customer'
+                ELSE 'Standard follow-up'
+              END as priority_reason
+            FROM store_orders
+          )
+          SELECT 
+            id as "storeId",
+            json_build_object(
+              'name', name,
+              'city', city,
+              'region', state
+            ) as store,
+            ROUND(priority_score::numeric, 1) as "priorityScore",
+            priority_reason as "priorityReason"
+          FROM priority_scores
+          ORDER BY priority_score DESC
+          LIMIT 1
+        `;
+        
+        const highestResult = await db.query(highestQuery, [currentStoreId]);
+        
+        res.json({
+          success: true,
+          data: highestResult.rows[0] || null
+        });
+      }
+    } catch (error) {
+      logger.error('Error fetching previous priority call', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch previous priority call'
       });
     }
   });
@@ -483,6 +687,120 @@ export function createDashboardRoutes(): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to fetch pending orders'
+      });
+    }
+  });
+
+  // Get recent actual orders (from document uploads and manual entries)
+  router.get('/orders/recent', async (req: Request, res: Response) => {
+    try {
+      const storeId = req.query.store_id as string;
+      const limit = parseInt(req.query.limit as string) || 10;
+      logger.info('Fetching recent actual orders', { storeId, limit, headers: req.headers });
+      
+      const query = storeId ? `
+        SELECT 
+          o.id,
+          o.order_number,
+          o.store_id,
+          json_build_object(
+            'id', s.id,
+            'name', s.name,
+            'city', s.city,
+            'region', s.state
+          ) as store,
+          o.customer_name,
+          o.customer_phone,
+          o.customer_email,
+          o.order_date,
+          o.status,
+          o.items,
+          o.item_count,
+          o.total_quantity,
+          o.total_amount,
+          o.source,
+          o.extraction_confidence,
+          o.data_quality_score,
+          o.created_at,
+          o.notes
+        FROM orders o
+        JOIN stores s ON o.store_id = s.id
+        WHERE o.store_id = $1
+        ORDER BY o.created_at DESC
+        LIMIT $2
+      ` : `
+        SELECT 
+          o.id,
+          o.order_number,
+          o.store_id,
+          json_build_object(
+            'id', s.id,
+            'name', s.name,
+            'city', s.city,
+            'region', s.state
+          ) as store,
+          o.customer_name,
+          o.customer_phone,
+          o.customer_email,
+          o.order_date,
+          o.status,
+          o.items,
+          o.item_count,
+          o.total_quantity,
+          o.total_amount,
+          o.source,
+          o.extraction_confidence,
+          o.data_quality_score,
+          o.created_at,
+          o.notes
+        FROM orders o
+        JOIN stores s ON o.store_id = s.id
+        ORDER BY o.created_at DESC
+        LIMIT $1
+      `;
+      
+      const params = storeId ? [storeId, limit] : [limit];
+      const result = await db.query(query, params);
+      
+      logger.info(`Found ${result.rows.length} recent orders`);
+      
+      res.json({
+        success: true,
+        data: result.rows
+      });
+    } catch (error: any) {
+      logger.error('Failed to fetch recent orders', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch recent orders',
+        message: error.message
+      });
+    }
+  });
+
+  // Get pending orders history
+  router.get('/orders/pending/history', async (req: Request, res: Response) => {
+    try {
+      logger.info('Fetching pending orders history');
+      
+      // Return mock data for now - this will be replaced with actual database query
+      const mockHistory = {
+        success: true,
+        data: {
+          orders: [],
+          total: 0,
+          page: 1,
+          limit: 10
+        }
+      };
+      
+      res.json(mockHistory);
+    } catch (error: any) {
+      logger.error('Failed to fetch pending orders history', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch pending orders history',
+        message: error.message
       });
     }
   });
@@ -765,6 +1083,54 @@ export function createDashboardRoutes(): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to fetch invoices'
+      });
+    }
+  });
+
+  // Public test endpoint for recent orders (no auth required)
+  router.get('/orders/recent-public', async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 5;
+      logger.info('Fetching recent orders (public endpoint)', { limit });
+      
+      const query = `
+        SELECT 
+          o.id,
+          o.order_number,
+          o.store_id,
+          json_build_object(
+            'id', s.id,
+            'name', s.name,
+            'city', s.city,
+            'region', s.state
+          ) as store,
+          o.customer_name,
+          o.total_amount,
+          o.source,
+          o.status,
+          o.created_at
+        FROM orders o
+        JOIN stores s ON o.store_id = s.id
+        WHERE o.source = 'document'
+        ORDER BY o.created_at DESC
+        LIMIT $1
+      `;
+      
+      const result = await db.query(query, [limit]);
+      
+      logger.info(`Found ${result.rows.length} recent orders (public)`);
+      
+      res.json({
+        success: true,
+        data: result.rows,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      logger.error('Failed to fetch recent orders (public)', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch recent orders',
+        message: error.message
       });
     }
   });

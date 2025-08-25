@@ -25,6 +25,7 @@ import {
   TableHead,
   TableRow,
   Alert,
+  AlertTitle,
   FormControl,
   InputLabel,
   Select,
@@ -34,7 +35,11 @@ import {
   FormControlLabel,
   Checkbox,
   ToggleButton,
-  ToggleButtonGroup
+  ToggleButtonGroup,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -52,7 +57,10 @@ import {
   Analytics as AnalyticsIcon,
   CompareArrows as CompareArrowsIcon,
   ShowChart as ShowChartIcon,
-  BarChart as BarChartIcon
+  BarChart as BarChartIcon,
+  CloudUpload as CloudUploadIcon,
+  Description as DocumentIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import {
   LineChart,
@@ -75,6 +83,8 @@ import {
 import api from '../../services/api';
 import apiGatewayClient from '../../services/api-gateway-client';
 import { Store, PredictedOrder, HistoricalInvoice, CallPrioritization } from '../../types/models';
+import DocumentUpload from '../../components/documents/DocumentUpload';
+import { documentApi } from '../../services/document-api';
 
 interface ChartDataPoint {
   date: string;
@@ -127,12 +137,15 @@ const StoreDetailPage: React.FC = () => {
   
   const [store, setStore] = useState<Store | null>(null);
   const [predictedOrders, setPredictedOrders] = useState<PredictedOrder[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [historicalInvoices, setHistoricalInvoices] = useState<HistoricalInvoice[]>([]);
   const [callPrioritization, setCallPrioritization] = useState<CallPrioritization | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<any>(null);
   
   // Analytics state
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('month');
@@ -145,6 +158,33 @@ const StoreDetailPage: React.FC = () => {
   const [showOrderCount, setShowOrderCount] = useState(true);
   const [showAvgOrderValue, setShowAvgOrderValue] = useState(false);
   
+  // Handle order deletion
+  const handleDeleteOrder = (order: any) => {
+    setOrderToDelete(order);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    
+    try {
+      // Call API to delete order
+      await apiGatewayClient.delete(`/api/orders/${orderToDelete.id}`);
+      
+      // Update local state to remove the deleted order
+      setRecentOrders(prev => prev.filter(o => o.id !== orderToDelete.id));
+      
+      // Show success message
+      console.log('Order deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete order:', error);
+      setError('Failed to delete order. Please try again.');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setOrderToDelete(null);
+    }
+  };
+
   // Process invoice data for charts
   const processChartData = (invoices: HistoricalInvoice[], window: TimeWindow) => {
     if (!invoices || invoices.length === 0) return;
@@ -263,12 +303,22 @@ const StoreDetailPage: React.FC = () => {
   
   // Fetch store data
   useEffect(() => {
+    // Reset state when ID changes
+    setStore(null);
+    setPredictedOrders([]);
+    setHistoricalInvoices([]);
+    setCallPrioritization(null);
+    setChartData([]);
+    setProductSalesData([]);
+    setError(null);
+    
     let mounted = true;
     const fetchStoreData = async () => {
       if (!id || !mounted) return;
       
       try {
         setLoading(true);
+        setError(null);
         console.log('[StoreDetailPage] Starting to fetch data for store:', id);
         
         // Fetch store details
@@ -277,6 +327,11 @@ const StoreDetailPage: React.FC = () => {
         console.log('[StoreDetailPage] Store response:', JSON.stringify(storeResponse, null, 2));
         console.log('[StoreDetailPage] Store response type:', typeof storeResponse);
         console.log('[StoreDetailPage] Store response keys:', storeResponse ? Object.keys(storeResponse) : 'null');
+        
+        if (!storeResponse || !storeResponse.id) {
+          throw new Error('Invalid store data received');
+        }
+        
         setStore(storeResponse);
         
         // Fetch predicted orders for this store
@@ -302,6 +357,17 @@ const StoreDetailPage: React.FC = () => {
             updatedAt: order.updated_at || order.updatedAt
           })) : [];
         setPredictedOrders(mappedOrders);
+        
+        // Fetch recent actual orders for this store
+        console.log('[StoreDetailPage] Fetching recent actual orders for store:', id);
+        try {
+          const recentOrdersResponse = await apiGatewayClient.get(`/api/orders/recent?store_id=${id}&limit=20`);
+          console.log('[StoreDetailPage] Recent orders response:', recentOrdersResponse.data);
+          setRecentOrders(recentOrdersResponse.data || []);
+        } catch (err) {
+          console.error('[StoreDetailPage] Failed to fetch recent orders:', err);
+          setRecentOrders([]);
+        }
         
         // Fetch historical invoices for this store
         console.log('[StoreDetailPage] Fetching invoices for store:', id);
@@ -386,12 +452,11 @@ const StoreDetailPage: React.FC = () => {
         }
         
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error('[StoreDetailPage] Error fetching store data:', err);
         if (mounted) {
-          setError('Failed to load store data. Please try again later.');
-        }
-        if (mounted) {
+          const errorMessage = err.response?.data?.error || err.message || 'Failed to load store data. Please try again later.';
+          setError(errorMessage);
           setLoading(false);
         }
       }
@@ -481,13 +546,62 @@ const StoreDetailPage: React.FC = () => {
     }
   };
 
+  // Handle navigation to previous priority call
+  const handlePreviousPriorityCall = async () => {
+    try {
+      console.log('[StoreDetailPage] Fetching previous priority for store:', id);
+      const response = await apiGatewayClient.get(`/api/calls/previous-priority/${id}`);
+      console.log('[StoreDetailPage] Previous priority full response:', {
+        data: response?.data,
+        status: response?.status,
+        success: response?.data?.success,
+        storeData: response?.data?.data
+      });
+      
+      // Check for data in success wrapper first, then direct fields
+      const previousStoreId = response?.data?.data?.storeId || 
+                              response?.data?.data?.store_id || 
+                              response?.data?.storeId || 
+                              response?.data?.store_id;
+      
+      console.log('[StoreDetailPage] Extracted previousStoreId:', previousStoreId);
+      
+      if (previousStoreId) {
+        console.log('[StoreDetailPage] Navigating to previous store:', previousStoreId);
+        navigate(`/stores/${previousStoreId}`);
+      } else {
+        console.log('[StoreDetailPage] No previous priority store found in response');
+        console.log('[StoreDetailPage] Full response data:', JSON.stringify(response?.data));
+        // Try to at least go to the first store in the priority list
+        const fallbackResponse = await apiGatewayClient.get('/api/calls/prioritized?limit=1');
+        const fallbackStoreId = fallbackResponse?.data?.data?.[0]?.storeId;
+        if (fallbackStoreId && fallbackStoreId !== id) {
+          console.log('[StoreDetailPage] Using fallback store:', fallbackStoreId);
+          navigate(`/stores/${fallbackStoreId}`);
+        } else {
+          navigate('/calls');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching previous priority call:', error);
+      navigate('/calls');
+    }
+  };
+
   // Handle navigation to next priority call
   const handleNextPriorityCall = async () => {
     try {
       const response = await apiGatewayClient.get(`/api/calls/next-priority/${id}`);
-      if (response?.data?.store_id) {
-        navigate(`/stores/${response.data.store_id}`);
+      console.log('[StoreDetailPage] Next priority response:', response);
+      
+      // Check for both storeId and store_id for compatibility
+      const nextStoreId = response?.data?.storeId || response?.data?.store_id;
+      
+      if (nextStoreId) {
+        console.log('[StoreDetailPage] Navigating to next store:', nextStoreId);
+        navigate(`/stores/${nextStoreId}`);
       } else {
+        console.log('[StoreDetailPage] No next priority store found, going to calls list');
         // No next priority, go to calls list
         navigate('/calls');
       }
@@ -653,16 +767,24 @@ const StoreDetailPage: React.FC = () => {
                   <Typography variant="body1" fontWeight="medium">
                     Priority Score
                   </Typography>
-                  <Chip 
-                    label={
-                      callPrioritization.priorityScore >= 8 ? 'High' : 
-                      callPrioritization.priorityScore >= 5 ? 'Medium' : 'Low'
-                    }
-                    color={
-                      callPrioritization.priorityScore >= 8 ? 'error' : 
-                      callPrioritization.priorityScore >= 5 ? 'warning' : 'default'
-                    }
-                  />
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="h6" fontWeight="bold" color="primary">
+                      {typeof callPrioritization.priorityScore === 'number' 
+                        ? callPrioritization.priorityScore.toFixed(1) 
+                        : parseFloat(callPrioritization.priorityScore || 0).toFixed(1)}
+                    </Typography>
+                    <Chip 
+                      label={
+                        callPrioritization.priorityScore >= 8 ? 'High' : 
+                        callPrioritization.priorityScore >= 5 ? 'Medium' : 'Low'
+                      }
+                      color={
+                        callPrioritization.priorityScore >= 8 ? 'error' : 
+                        callPrioritization.priorityScore >= 5 ? 'warning' : 'default'
+                      }
+                      size="small"
+                    />
+                  </Box>
                 </Box>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">
@@ -707,19 +829,33 @@ const StoreDetailPage: React.FC = () => {
                     />
                   </Grid>
                 </Grid>
-                <Box mt={3} display="flex" justifyContent="space-between" gap={2}>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={handleNextPriorityCall}
-                  >
-                    Next Priority Call →
-                  </Button>
+                <Box mt={3}>
+                  <Box display="flex" justifyContent="space-between" gap={1} mb={2}>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<ArrowBackIcon />}
+                      onClick={handlePreviousPriorityCall}
+                      sx={{ flex: 1 }}
+                    >
+                      Previous Store
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      endIcon={<ArrowForwardIcon />}
+                      onClick={handleNextPriorityCall}
+                      sx={{ flex: 1 }}
+                    >
+                      Next Store
+                    </Button>
+                  </Box>
                   <Button
                     variant="contained"
                     color="primary"
                     startIcon={<ShoppingCartIcon />}
                     onClick={handleCreateOrder}
+                    fullWidth
                   >
                     Create New Order
                   </Button>
@@ -743,11 +879,13 @@ const StoreDetailPage: React.FC = () => {
           onChange={handleTabChange}
           indicatorColor="primary"
           textColor="primary"
-          variant="fullWidth"
+          variant="scrollable"
+          scrollButtons="auto"
         >
           <Tab label="Analytics" icon={<AnalyticsIcon />} iconPosition="start" />
           <Tab label="Predicted Orders" icon={<ShoppingCartIcon />} iconPosition="start" />
           <Tab label="Order History" icon={<CalendarIcon />} iconPosition="start" />
+          <Tab label="Scan Orders" icon={<CloudUploadIcon />} iconPosition="start" />
         </Tabs>
         
         {/* Analytics Tab */}
@@ -1181,11 +1319,113 @@ const StoreDetailPage: React.FC = () => {
             Order History
           </Typography>
           
-          {historicalInvoices.length === 0 ? (
-            <Alert severity="info">
-              No order history available for this store.
-            </Alert>
-          ) : (
+          {/* Recent Orders from Document Uploads */}
+          {recentOrders.length > 0 && (
+            <Box mb={4}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+                Recent Orders (From Document Uploads)
+              </Typography>
+              <TableContainer component={Paper} elevation={1}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><Typography variant="subtitle2">Order Number</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Date</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Customer</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Items</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Amount</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Source</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Status</Typography></TableCell>
+                      <TableCell><Typography variant="subtitle2">Actions</Typography></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {recentOrders.map((order) => (
+                      <TableRow 
+                        key={order.id} 
+                        hover 
+                        onClick={() => navigate(`/orders/${order.id}`)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                            {order.order_number}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {order.customer_name || 'Document Upload Customer'}
+                          </Typography>
+                          {order.customer_phone && (
+                            <Typography variant="caption" color="text.secondary">
+                              {order.customer_phone}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {order.item_count} items ({order.total_quantity} qty)
+                        </TableCell>
+                        <TableCell>
+                          ₹{order.total_amount?.toLocaleString() || '0'}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={order.source === 'document' ? 'Document' : 'Manual'}
+                            color={order.source === 'document' ? 'success' : 'primary'}
+                            size="small"
+                            icon={order.source === 'document' ? <DocumentIcon /> : undefined}
+                          />
+                          {order.extraction_confidence && (
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              {(order.extraction_confidence * 100).toFixed(0)}% confidence
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={order.status || 'pending_review'}
+                            color={
+                              order.status === 'completed' ? 'success' : 
+                              order.status === 'pending_review' ? 'warning' : 
+                              'default'
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteOrder(order);
+                            }}
+                            title="Delete Order"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+          
+          {/* Historical Invoices */}
+          <Box>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+              Historical Invoices
+            </Typography>
+            {historicalInvoices.length === 0 ? (
+              <Alert severity="info">
+                No historical invoices available for this store.
+              </Alert>
+            ) : (
             <TableContainer>
               <Table>
                 <TableHead>
@@ -1244,10 +1484,448 @@ const StoreDetailPage: React.FC = () => {
                 </TableBody>
               </Table>
             </TableContainer>
-          )}
+            )}
+          </Box>
+        </TabPanel>
+
+        {/* Scan Orders Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Box>
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>
+                Upload Order Documents
+              </Typography>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Upload scanned order forms, PDFs, or photos of orders. Our system will automatically extract the order information and convert it to a digital order form.
+              </Typography>
+            </Box>
+            
+            <DocumentUpload
+              storeId={id}
+              onUploadComplete={async (documentIds) => {
+                console.log('Documents uploaded:', documentIds);
+                // Optionally refresh or show success message
+                // Could also navigate to a processing view
+              }}
+              onError={(error) => {
+                console.error('Upload error:', error);
+                // Show error notification
+              }}
+              maxFiles={10}
+              showPreview={true}
+              autoUpload={false}
+            />
+            
+            {/* Recent Uploads Section */}
+            <Box mt={4}>
+              <Typography variant="h6" gutterBottom>
+                Recent Document Uploads
+              </Typography>
+              <DocumentHistoryList storeId={id || ''} />
+            </Box>
+          </Box>
         </TabPanel>
       </Paper>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirm Delete Order
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="delete-dialog-description">
+            Are you sure you want to delete order {orderToDelete?.order_number || orderToDelete?.id?.slice(-8)}?
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={confirmDeleteOrder} color="error" variant="contained" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+  );
+};
+
+// Document History Component with Classification Results
+const DocumentHistoryList: React.FC<{ storeId: string }> = ({ storeId }) => {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [processingResults, setProcessingResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [storeId]);
+
+  const loadDocuments = async () => {
+    try {
+      setLoading(true);
+      
+      // Load documents and processing results in parallel
+      const [docsResponse, resultsResponse] = await Promise.all([
+        documentApi.getStoreDocuments(storeId),
+        documentApi.getStoreProcessingResults(storeId, undefined, 20, 0)
+      ]);
+      
+      if (docsResponse.success) {
+        setDocuments(docsResponse.data.documents || []);
+      }
+      
+      if (resultsResponse.success) {
+        setProcessingResults(resultsResponse.data.results || []);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getProcessingResult = (documentId: string) => {
+    return processingResults.find(r => r.document?.id === documentId);
+  };
+
+  const getQualityColor = (quality: number) => {
+    if (quality >= 0.8) return 'success';
+    if (quality >= 0.6) return 'warning';
+    return 'error';
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'success';
+    if (confidence >= 0.6) return 'warning';
+    return 'error';
+  };
+
+  const handleViewDetails = async (documentId: string) => {
+    setSelectedDocument(documentId);
+    setDetailsOpen(true);
+  };
+
+  if (loading) {
+    return <CircularProgress size={24} />;
+  }
+
+  if (documents.length === 0) {
+    return (
+      <Alert severity="info">
+        No documents uploaded yet for this store.
+      </Alert>
+    );
+  }
+
+  return (
+    <>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>File Name</TableCell>
+              <TableCell>Upload Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Classification</TableCell>
+              <TableCell>Quality</TableCell>
+              <TableCell>Confidence</TableCell>
+              <TableCell>Size</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {documents.map((doc) => {
+              const result = getProcessingResult(doc.documentId);
+              const classification = result?.classification;
+              
+              return (
+                <TableRow key={doc.documentId}>
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <DocumentIcon fontSize="small" />
+                      <Typography variant="body2">{doc.fileName}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(doc.uploadedAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={doc.status}
+                      size="small"
+                      color={
+                        doc.status === 'completed' ? 'success' :
+                        doc.status === 'processing' ? 'primary' :
+                        doc.status === 'failed' ? 'error' : 'default'
+                      }
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {classification ? (
+                      <Chip
+                        label={classification.documentClass}
+                        size="small"
+                        variant="outlined"
+                      />
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {classification ? (
+                      <Chip
+                        label={`${(classification.quality * 100).toFixed(0)}%`}
+                        size="small"
+                        color={getQualityColor(classification.quality)}
+                      />
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {classification ? (
+                      <Chip
+                        label={`${(classification.confidence * 100).toFixed(0)}%`}
+                        size="small"
+                        color={getConfidenceColor(classification.confidence)}
+                      />
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {(doc.fileSize / 1024).toFixed(2)} KB
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={0.5} justifyContent="flex-end">
+                      {doc.status === 'completed' && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewDetails(doc.documentId)}
+                          title="View classification details"
+                        >
+                          <ArrowForwardIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={async () => {
+                          if (window.confirm('Delete this document?')) {
+                            await documentApi.deleteDocument(doc.documentId);
+                            loadDocuments();
+                          }
+                        }}
+                        title="Delete document"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Classification Details Dialog */}
+      {selectedDocument && (
+        <ClassificationDetailsDialog
+          documentId={selectedDocument}
+          open={detailsOpen}
+          onClose={() => {
+            setDetailsOpen(false);
+            setSelectedDocument(null);
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+// Classification Details Dialog Component
+const ClassificationDetailsDialog: React.FC<{
+  documentId: string;
+  open: boolean;
+  onClose: () => void;
+}> = ({ documentId, open, onClose }) => {
+  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<any>(null);
+
+  useEffect(() => {
+    if (open && documentId) {
+      loadDetails();
+    }
+  }, [open, documentId]);
+
+  const loadDetails = async () => {
+    try {
+      setLoading(true);
+      const response = await documentApi.getDocumentProcessingResult(documentId);
+      if (response.success) {
+        setResult(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading classification details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Document Classification Details</Typography>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Box display="flex" justifyContent="center" p={3}>
+            <CircularProgress />
+          </Box>
+        ) : result ? (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                Document Information
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Typography variant="body2">
+                  <strong>File:</strong> {result.document?.fileName}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Status:</strong> {result.document?.status}
+                </Typography>
+                {result.document?.processingTimeMs && (
+                  <Typography variant="body2">
+                    <strong>Processing Time:</strong> {(result.document.processingTimeMs / 1000).toFixed(2)}s
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+
+            {result.classification && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Classification Results
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={4}>
+                    <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary">Document Type</Typography>
+                      <Typography variant="h6">{result.classification.documentClass}</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary">Quality Score</Typography>
+                      <Typography variant="h6" color={
+                        result.classification.quality >= 0.8 ? 'success.main' :
+                        result.classification.quality >= 0.6 ? 'warning.main' : 'error.main'
+                      }>
+                        {(result.classification.quality * 100).toFixed(0)}%
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary">Confidence</Typography>
+                      <Typography variant="h6" color={
+                        result.classification.confidence >= 0.8 ? 'success.main' :
+                        result.classification.confidence >= 0.6 ? 'warning.main' : 'error.main'
+                      }>
+                        {(result.classification.confidence * 100).toFixed(0)}%
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {result.classification.ocrEngine && (
+                  <Box mt={2}>
+                    <Typography variant="body2">
+                      <strong>Recommended OCR Engine:</strong> {result.classification.ocrEngine}
+                    </Typography>
+                  </Box>
+                )}
+
+                {result.classification.preprocessingApplied && result.classification.preprocessingApplied.length > 0 && (
+                  <Box mt={2}>
+                    <Typography variant="body2" gutterBottom>
+                      <strong>Preprocessing Applied:</strong>
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {result.classification.preprocessingApplied.map((op: string, index: number) => (
+                        <Chip key={index} label={op} size="small" variant="outlined" />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Grid>
+            )}
+
+            {result.confidenceScores && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Confidence Breakdown
+                </Typography>
+                {result.confidenceScores.factors && (
+                  <Box display="flex" flexDirection="column" gap={1}>
+                    {Object.entries(result.confidenceScores.factors).map(([key, value]: [string, any]) => (
+                      <Box key={key} display="flex" justifyContent="space-between">
+                        <Typography variant="body2">{key.replace(/([A-Z])/g, ' $1').trim()}:</Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {(Number(value) * 100).toFixed(0)}%
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Grid>
+            )}
+
+            {result.validationErrors && result.validationErrors.length > 0 && (
+              <Grid item xs={12}>
+                <Alert severity="warning">
+                  <AlertTitle>Validation Issues</AlertTitle>
+                  <List dense>
+                    {result.validationErrors.map((error: any, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemText
+                          primary={error.field}
+                          secondary={error.error}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Alert>
+              </Grid>
+            )}
+          </Grid>
+        ) : (
+          <Alert severity="error">Failed to load classification details</Alert>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        {result?.document?.status === 'completed' && (
+          <Button variant="contained" color="primary">
+            Review Extracted Data
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
   );
 };
 

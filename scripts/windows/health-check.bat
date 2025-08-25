@@ -8,7 +8,7 @@ echo.
 echo Checking service health status...
 echo.
 
-set TOTAL_SERVICES=5
+set TOTAL_SERVICES=6
 set HEALTHY_SERVICES=0
 set WARNING_SERVICES=0
 set FAILED_SERVICES=0
@@ -84,9 +84,10 @@ echo ----------------------
 REM Check each service
 call :CheckService "Frontend" "http://localhost:3000" "3000"
 call :CheckService "API Gateway" "http://localhost:3007/health" "3007"
-call :CheckService "AI Service" "http://localhost:3001/health" "3001"
-call :CheckService "PM Orchestrator" "http://localhost:3002/health" "3002"
-call :CheckService "Zoho Integration" "http://localhost:3003/health" "3003"
+call :CheckService "AI Service" "http://localhost:3006/health" "3006"
+call :CheckService "Document Processor" "http://localhost:3010/health" "3010"
+call :CheckService "PM Orchestrator" "http://localhost:3003/health" "3003"
+call :CheckService "Zoho Integration" "http://localhost:3002/health" "3002"
 
 echo.
 echo [API Endpoints]

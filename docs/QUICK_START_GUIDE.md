@@ -90,7 +90,7 @@ This guide will get you up and running with the Mangalm Sales Assistant in **30 
 4. **Create database and user for Mangalm:**
    ```powershell
    # Connect to PostgreSQL using psql (replace [version] with your version, e.g., 17)
-   & 'C:\Program Files\PostgreSQL\[version]\bin\psql.exe' -U postgres
+   & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres
    
    # In the psql prompt, run these commands:
    CREATE DATABASE mangalm_sales;
@@ -104,7 +104,7 @@ This guide will get you up and running with the Mangalm Sales Assistant in **30 
    **Then enable required extensions:**
    ```powershell
    # Connect to the new database with the mangalm user
-   & 'C:\Program Files\PostgreSQL\[version]\bin\psql.exe' -U mangalm -h localhost -d mangalm_sales
+   & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U mangalm -h localhost -d mangalm_sales
    
    # Enable extensions (enter password: mangalm_secure_2024 when prompted)
    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

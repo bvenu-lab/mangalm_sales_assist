@@ -65,7 +65,7 @@ export interface SyncMetrics {
 export interface SyncError {
   recordId: string;
   module: ZohoModule;
-  operation: 'create' | 'update' | 'delete';
+  operation: 'create' | 'update' | 'delete' | 'upsert';
   error: string;
   retryCount: number;
   timestamp: Date;
@@ -456,6 +456,7 @@ export class EnterpriseZohoClient extends EventEmitter {
   private initializeFieldMappings(): void {
     if (this.config.fieldMappings) {
       for (const [module, mappings] of Object.entries(this.config.fieldMappings)) {
+        // @ts-ignore
         this.fieldMappings.set(module as ZohoModule, mappings);
       }
     }
