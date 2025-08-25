@@ -3,6 +3,11 @@ substitutions:
   _REPO: mangalm-services
   _ENV: production
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  substitutionOption: 'ALLOW_LOOSE'
+
 steps:
   # Build and deploy Sales Frontend
   - name: 'gcr.io/cloud-builders/docker'
