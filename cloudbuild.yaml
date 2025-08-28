@@ -92,33 +92,33 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Build and deploy Zoho Integration Service
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build',
-           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
-           '-f', 'services/zoho-integration/Dockerfile',
-           './services/zoho-integration']
+  # Build and deploy Zoho Integration Service - DISABLED FOR NOW
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args: ['build',
+  #          '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
+  #          '-f', 'services/zoho-integration/Dockerfile',
+  #          './services/zoho-integration']
   
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push',
-           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA']
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args: ['push',
+  #          '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA']
   
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      ['run', 'deploy', 'mangalm-zoho-integration',
-       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
-       '--region', '${_REGION}',
-       '--no-allow-unauthenticated',
-       '--port', '3005',
-       '--cpu', '1',
-       '--memory', '1Gi',
-       '--concurrency', '50',
-       '--min-instances', '0',
-       '--max-instances', '10',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
-       '--set-secrets', 'DB_PASSWORD=db-password:latest',
-       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: gcloud
+  #   args:
+  #     ['run', 'deploy', 'mangalm-zoho-integration',
+  #      '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
+  #      '--region', '${_REGION}',
+  #      '--no-allow-unauthenticated',
+  #      '--port', '3005',
+  #      '--cpu', '1',
+  #      '--memory', '1Gi',
+  #      '--concurrency', '50',
+  #      '--min-instances', '0',
+  #      '--max-instances', '10',
+  #      '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+  #      '--set-secrets', 'DB_PASSWORD=db-password:latest',
+  #      '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Build and deploy Document Processor Service
   - name: 'gcr.io/cloud-builders/docker'
@@ -152,7 +152,7 @@ images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA'
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA'
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA'
-  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA'
+  # - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA'  # DISABLED
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA'
 
 timeout: 1800s
