@@ -189,7 +189,10 @@
       "Bash(gcloud services enable:*)",
       "Bash(gcloud auth:*)",
       "Bash(gcloud config set:*)",
-      "Bash(gcloud builds submit:*)"
+      "Bash(gcloud builds submit:*)",
+      "Bash(set REACT_APP_API_GATEWAY_URL=http://localhost:3007)",
+      "Bash(start http://localhost:3001/upload)",
+      "Bash(start http://localhost:3000/upload)"
     ],
     "deny": []
   }

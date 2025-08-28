@@ -67,6 +67,7 @@ const App: React.FC = () => {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/bulk-upload" element={<BulkUploadPage />} />
+            <Route path="/upload" element={<BulkUploadPage />} />
           </Route>
         </Route>
 
