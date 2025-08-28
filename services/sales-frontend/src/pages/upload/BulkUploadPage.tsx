@@ -40,17 +40,69 @@ const BulkUploadPage: React.FC = () => {
     setError(null);
 
     try {
-      // TODO: Implement actual bulk upload API call
-      console.log('Uploading files:', selectedFiles);
+      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007';
+      const token = localStorage.getItem('authToken');
       
-      // Simulate upload process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Process each file
+      let totalProcessed = 0;
+      let totalFailed = 0;
+      const allErrors: string[] = [];
       
-      setUploadSuccess(true);
-      setSelectedFiles(null);
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        console.log(`Processing file ${i + 1}/${selectedFiles.length}: ${file.name}`);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+          const response = await fetch(`${apiUrl}/api/orders/import`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: formData
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            totalProcessed += result.processedCount || 0;
+            totalFailed += result.failedCount || 0;
+            if (result.errors && result.errors.length > 0) {
+              allErrors.push(...result.errors);
+            }
+            console.log(`File processed: ${result.message}`, result);
+          } else {
+            throw new Error(result.message || 'Import failed');
+          }
+        } catch (fileError) {
+          console.error(`Failed to upload ${file.name}:`, fileError);
+          allErrors.push(`${file.name}: ${fileError instanceof Error ? fileError.message : 'Upload failed'}`);
+          totalFailed++;
+        }
+      }
       
-      // Clear success message after 5 seconds
-      setTimeout(() => setUploadSuccess(false), 5000);
+      // Show results
+      if (totalProcessed > 0) {
+        setUploadSuccess(true);
+        setSelectedFiles(null);
+        
+        // Build success message
+        let message = `Successfully imported ${totalProcessed} order(s)`;
+        if (totalFailed > 0) {
+          message += `, ${totalFailed} failed`;
+        }
+        
+        if (allErrors.length > 0) {
+          setError(`${message}. Errors: ${allErrors.slice(0, 3).join('; ')}${allErrors.length > 3 ? '...' : ''}`);
+        } else {
+          // Clear success message after 5 seconds
+          setTimeout(() => setUploadSuccess(false), 5000);
+        }
+      } else {
+        throw new Error('Failed to import any orders');
+      }
       
     } catch (err) {
       console.error('Upload failed:', err);
@@ -61,9 +113,11 @@ const BulkUploadPage: React.FC = () => {
   };
 
   const downloadSampleCSV = () => {
-    const sampleData = `store_id,customer_name,customer_phone,customer_email,items,total_amount
-4261931000001048015,John Doe,+1-555-123-4567,john@example.com,"[{""productName"": ""Samosa"", ""quantity"": 10, ""unitPrice"": 12, ""totalPrice"": 120}]",120.00
-4261931000001048015,Jane Smith,+1-555-987-6543,jane@example.com,"[{""productName"": ""Bhel Puri"", ""quantity"": 5, ""unitPrice"": 15, ""totalPrice"": 75}]",75.00`;
+    const sampleData = `Invoice ID,Customer Name,Customer ID,Item Name,Quantity,Item Price,Total
+INV-001,John Doe,4261931000001048015,Samosa,10,12,120
+INV-001,John Doe,4261931000001048015,Chai,5,10,50
+INV-002,Jane Smith,4261931000001048015,Bhel Puri,5,15,75
+INV-002,Jane Smith,4261931000001048015,Pani Puri,10,12,120`;
     
     const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -169,12 +223,16 @@ const BulkUploadPage: React.FC = () => {
               </Typography>
 
               <Typography variant="body2" color="text.secondary" paragraph>
-                <strong>Required columns:</strong><br/>
-                • store_id<br/>
-                • customer_name<br/>
-                • customer_phone<br/>
-                • items (JSON format)<br/>
-                • total_amount
+                <strong>Supported columns (flexible names):</strong><br/>
+                • Invoice ID / Order Number<br/>
+                • Customer Name<br/>
+                • Customer ID / Store ID<br/>
+                • Item Name / Product Name<br/>
+                • Quantity<br/>
+                • Item Price / Unit Price<br/>
+                • Total / SubTotal<br/>
+                <br/>
+                <em>Multiple items with the same Invoice ID will be grouped into one order.</em>
               </Typography>
 
               <Button

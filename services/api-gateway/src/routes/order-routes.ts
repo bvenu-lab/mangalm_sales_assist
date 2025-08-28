@@ -910,10 +910,29 @@ router.post('/orders/import',
         });
       }
 
-      // Group orders by order_number
+      // Helper function to find column value with multiple possible names
+      const getColumnValue = (row: any, possibleNames: string[], defaultValue: any = '') => {
+        for (const name of possibleNames) {
+          // Check exact match
+          if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+            return row[name];
+          }
+          // Check case-insensitive match
+          const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase());
+          if (key && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+            return row[key];
+          }
+        }
+        return defaultValue;
+      };
+
+      // Group orders by order_number or invoice_id
       const orderGroups = new Map<string, any[]>();
       for (const row of orders) {
-        const orderNumber = row.order_number || `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        const orderNumber = getColumnValue(row, 
+          ['order_number', 'Invoice Number', 'Invoice ID', 'invoice_id', 'order_id'],
+          `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        );
         if (!orderGroups.has(orderNumber)) {
           orderGroups.set(orderNumber, []);
         }
@@ -929,18 +948,43 @@ router.post('/orders/import',
         try {
           // Extract common order info from first item
           const firstItem = items[0];
-          const storeId = firstItem.store_id || '4261931000001048015'; // Default store if not provided
-          const customerName = firstItem.customer_name || 'CSV Import Customer';
-          const customerPhone = firstItem.customer_phone || '';
-          const customerEmail = firstItem.customer_email || '';
+          const storeId = getColumnValue(firstItem, 
+            ['store_id', 'Store ID', 'Customer ID'], 
+            '4261931000001048015'
+          );
+          const customerName = getColumnValue(firstItem, 
+            ['customer_name', 'Customer Name', 'Customer'], 
+            'CSV Import Customer'
+          );
+          const customerPhone = getColumnValue(firstItem, 
+            ['customer_phone', 'Customer Phone', 'Phone', 'Shipping Phone'], 
+            ''
+          );
+          const customerEmail = getColumnValue(firstItem, 
+            ['customer_email', 'Customer Email', 'Email'], 
+            ''
+          );
           
           // Build items array
           const orderItems = items.map(item => ({
-            productName: item.product_name || item.productName || 'Unknown Product',
-            quantity: parseInt(item.quantity || '1'),
-            unitPrice: parseFloat(item.unit_price || item.unitPrice || '0'),
-            totalPrice: parseFloat(item.total_price || item.totalPrice || '0') || 
-                       (parseInt(item.quantity || '1') * parseFloat(item.unit_price || item.unitPrice || '0'))
+            productName: getColumnValue(item, 
+              ['product_name', 'productName', 'Item Name', 'Product', 'Item'], 
+              'Unknown Product'
+            ),
+            quantity: parseInt(getColumnValue(item, 
+              ['quantity', 'Quantity', 'Qty', 'qty'], 
+              '1'
+            )),
+            unitPrice: parseFloat(getColumnValue(item, 
+              ['unit_price', 'unitPrice', 'Item Price', 'Price'], 
+              '0'
+            )),
+            totalPrice: parseFloat(getColumnValue(item, 
+              ['total_price', 'totalPrice', 'Total', 'SubTotal', 'Item Total'], 
+              '0'
+            )) || 
+                       (parseInt(getColumnValue(item, ['quantity', 'Quantity'], '1')) * 
+                        parseFloat(getColumnValue(item, ['unit_price', 'unitPrice', 'Item Price'], '0')))
           }));
 
           // Calculate totals
