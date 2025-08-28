@@ -115,7 +115,10 @@ steps:
        '--memory', '1Gi',
        '--concurrency', '50',
        '--min-instances', '0',
-       '--max-instances', '10']
+       '--max-instances', '10',
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Build and deploy Document Processor Service
   - name: 'gcr.io/cloud-builders/docker'

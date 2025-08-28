@@ -41,7 +41,7 @@ ENV NODE_ENV=production
 ENV PORT=3004
 
 # Expose the port
-EXPOSE 3004
+EXPOSE 3006
 
 # Start the application
 CMD ["node", "dist/index.js"]

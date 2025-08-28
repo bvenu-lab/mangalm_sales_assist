@@ -17,7 +17,7 @@ RUN npm run build
 RUN mkdir -p logs
 
 # Expose port
-EXPOSE 3002
+EXPOSE 3005
 
 # Set environment variables
 ENV NODE_ENV=production
