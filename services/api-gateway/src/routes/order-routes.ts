@@ -20,7 +20,7 @@ import { auditLog } from '../middleware/audit';
 import axios from 'axios';
 import { Pool } from 'pg';
 import multer from 'multer';
-import csv from 'csv-parse';
+import { parse } from 'csv-parse';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import path from 'path';
@@ -879,17 +879,27 @@ router.post('/orders/import',
       if (fileExtension === '.csv') {
         // Parse CSV file
         const fileContent = fs.readFileSync(tempFilePath, 'utf-8');
-        const parser = csv.parse({
-          columns: true,
-          skip_empty_lines: true,
-          trim: true
-        });
-
+        
         orders = await new Promise((resolve, reject) => {
           const results: any[] = [];
-          parser.on('data', (data) => results.push(data));
+          const parser = parse({
+            columns: true,
+            skip_empty_lines: true,
+            trim: true,
+            relax_quotes: true,
+            relax_column_count: true
+          });
+          
+          parser.on('readable', function() {
+            let record;
+            while ((record = parser.read()) !== null) {
+              results.push(record);
+            }
+          });
+          
           parser.on('error', reject);
           parser.on('end', () => resolve(results));
+          
           parser.write(fileContent);
           parser.end();
         });
@@ -907,6 +917,15 @@ router.post('/orders/import',
         return res.status(400).json({
           success: false,
           message: 'No data found in file'
+        });
+      }
+
+      // Log first row to debug column names
+      if (orders.length > 0) {
+        logger.info('CSV columns detected:', {
+          columns: Object.keys(orders[0]),
+          firstRow: orders[0],
+          totalRows: orders.length
         });
       }
 
@@ -1082,10 +1101,25 @@ router.post('/orders/import',
         fs.unlinkSync(tempFilePath);
       }
 
+      // Provide more detailed error messages
+      let errorMessage = 'Failed to process import file';
+      if (error.message.includes('Unsupported file format')) {
+        errorMessage = 'Unsupported file format. Please upload a CSV or Excel file.';
+      } else if (error.message.includes('No data found')) {
+        errorMessage = 'No data found in file. Please check the file contains data.';
+      } else if (error.message.includes('parse')) {
+        errorMessage = 'Failed to parse file. Please check the CSV format and ensure it has proper column headers.';
+      } else if (error.message.includes('columns')) {
+        errorMessage = 'Invalid file format. Please ensure the CSV has the required columns.';
+      } else {
+        errorMessage = `Import failed: ${error.message}`;
+      }
+      
       res.status(500).json({
         success: false,
         error: 'Import failed',
-        message: error.message
+        message: errorMessage,
+        details: 'Please ensure your CSV has columns like: Invoice ID, Customer Name, Item Name, Quantity, Item Price, Total'
       });
     }
   }
