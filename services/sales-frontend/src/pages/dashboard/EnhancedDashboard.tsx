@@ -383,16 +383,42 @@ const EnhancedDashboard: React.FC = () => {
       });
     }
 
-    // Document processing insight - this is always available
+    // Single document upload insight
     insights.push({
-      title: 'Upload Orders',
-      value: 'Scan & Upload',
+      title: 'Quick Upload',
+      value: 'Single Order',
       severity: 'success',
       icon: <ScannerIcon />,
-      recommendation: 'Upload order images for instant processing or bulk import CSV/Excel files.',
+      recommendation: 'Upload a single order document or photo for instant processing.',
       action: {
         label: 'Upload Now',
         onClick: () => setShowUploadDialog(true),
+      },
+    });
+
+    // Bulk upload insight - prominently featured
+    insights.push({
+      title: 'Bulk Upload',
+      value: 'Multiple Orders',
+      severity: 'info',
+      icon: <CloudUploadIcon />,
+      recommendation: 'Process multiple order documents at once. Upload up to 20 files simultaneously for batch processing.',
+      action: {
+        label: 'Bulk Upload',
+        onClick: () => setShowBulkUploadDialog(true),
+      },
+    });
+
+    // CSV/Excel import insight
+    insights.push({
+      title: 'Import Data',
+      value: 'CSV/Excel',
+      severity: 'warning',
+      icon: <TableChartIcon />,
+      recommendation: 'Import historical orders from CSV or Excel files for analysis and predictions.',
+      action: {
+        label: 'Import File',
+        onClick: () => navigate('/orders/import'),
       },
     });
 
@@ -522,34 +548,37 @@ const EnhancedDashboard: React.FC = () => {
         </Box>
       )}
 
-      {/* Key Metrics */}
+      {/* Key Metrics - REAL DATA ONLY */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {[
           {
             title: 'Today\'s Revenue',
-            value: '$12,456',
-            change: 12.5,
+            value: dashboardData.performance?.totalRevenue ? 
+              `$${dashboardData.performance.totalRevenue.toFixed(2)}` : '$0.00',
+            change: 0,
             icon: <ShoppingCartIcon />,
             color: theme.palette.success.main,
           },
           {
             title: 'Orders Processed',
-            value: '156',
-            change: 8.3,
+            value: dashboardData.performance?.ordersPlaced?.toString() || '0',
+            change: 0,
             icon: <DocumentIcon />,
             color: theme.palette.primary.main,
           },
           {
             title: 'Conversion Rate',
-            value: '68%',
-            change: -2.1,
+            value: dashboardData.performance?.ordersPlaced > 0 ? 
+              `${((dashboardData.performance.ordersPlaced / (dashboardData.performance.callsCompleted || 1)) * 100).toFixed(0)}%` : '0%',
+            change: 0,
             icon: <TrendingUpIcon />,
             color: theme.palette.warning.main,
           },
           {
             title: 'Avg Order Value',
-            value: '$79.85',
-            change: 5.7,
+            value: dashboardData.performance?.averageOrderValue ? 
+              `$${dashboardData.performance.averageOrderValue.toFixed(2)}` : '$0.00',
+            change: 0,
             icon: <AssessmentIcon />,
             color: theme.palette.info.main,
           },
@@ -911,24 +940,43 @@ const EnhancedDashboard: React.FC = () => {
               subheader="Best selling products across all stores"
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <PieChart>
-                  <Pie
-                    data={dashboardData.topProducts}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                  >
-                    {dashboardData.topProducts?.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {dashboardData.topProducts && dashboardData.topProducts.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={dashboardData.topProducts}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                    >
+                      {dashboardData.topProducts?.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box 
+                  display="flex" 
+                  flexDirection="column" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  height={400}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <PieChartIcon sx={{ fontSize: 60, mb: 2, opacity: 0.3 }} />
+                  <Typography variant="h6" gutterBottom>
+                    No Product Data Available
+                  </Typography>
+                  <Typography variant="body2" textAlign="center">
+                    Product distribution will appear here once orders are processed.
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -954,38 +1002,58 @@ const EnhancedDashboard: React.FC = () => {
               }
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <ComposedChart data={dashboardData.storeTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.1)} />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <ChartTooltip />
-                  <Legend />
-                  <Area
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="revenue"
-                    fill={alpha(theme.palette.primary.main, 0.2)}
-                    stroke={theme.palette.primary.main}
-                    name="Revenue ($)"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="orders"
-                    stroke={theme.palette.secondary.main}
-                    strokeWidth={2}
-                    name="Orders"
-                  />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="target"
-                    fill={alpha(theme.palette.success.main, 0.3)}
-                    name="Target"
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+              {dashboardData.storeTrends && dashboardData.storeTrends.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <ComposedChart data={dashboardData.storeTrends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.1)} />
+                    <XAxis dataKey="date" />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <ChartTooltip />
+                    <Legend />
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="revenue"
+                      fill={alpha(theme.palette.primary.main, 0.2)}
+                      stroke={theme.palette.primary.main}
+                      name="Revenue ($)"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="orders"
+                      stroke={theme.palette.secondary.main}
+                      strokeWidth={2}
+                      name="Orders"
+                    />
+                    <Bar
+                      yAxisId="left"
+                      dataKey="target"
+                      fill={alpha(theme.palette.success.main, 0.3)}
+                      name="Target"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box 
+                  display="flex" 
+                  flexDirection="column" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  height={350}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <BarChartIcon sx={{ fontSize: 60, mb: 2, opacity: 0.3 }} />
+                  <Typography variant="h6" gutterBottom>
+                    No Performance Data Available
+                  </Typography>
+                  <Typography variant="body2" textAlign="center">
+                    Performance trends will appear here once orders are processed.
+                    Upload order documents or create orders to see trends.
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

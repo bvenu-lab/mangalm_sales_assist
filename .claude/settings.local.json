@@ -177,7 +177,19 @@
       "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"INSERT INTO predicted_orders (store_id, predicted_date, items, confidence, total_amount, status) VALUES (''4261931000001048015'', CURRENT_DATE + 2, ''[{\"\"product_name\"\": \"\"Samosa\"\", \"\"quantity\"\": 15}, {\"\"product_name\"\": \"\"Vada Pav\"\", \"\"quantity\"\": 10}]''::jsonb, 0.75, 350, ''pending'') RETURNING id, manual_verification_required, notes;\")",
       "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"SELECT alert_type, product_name, severity, alert_message FROM product_alerts WHERE product_name = ''Vada Pav'';\")",
       "Bash(npm rebuild:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"SELECT COUNT(*) FROM stores\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"DELETE FROM orders; DELETE FROM predicted_order_items; DELETE FROM predicted_orders; DELETE FROM call_prioritization;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"SELECT COUNT(*) as orders_count FROM orders; SELECT COUNT(*) as predicted_orders_count FROM predicted_orders; SELECT COUNT(*) as calls_count FROM call_prioritization;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"DELETE FROM orders; DELETE FROM predicted_order_items; DELETE FROM predicted_orders; DELETE FROM call_prioritization; DELETE FROM invoice_items; DELETE FROM historical_invoices; DELETE FROM stores; DELETE FROM products;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d mangalm_sales -c \"SELECT ''stores'' as table_name, COUNT(*) as count FROM stores UNION ALL SELECT ''products'', COUNT(*) FROM products UNION ALL SELECT ''orders'', COUNT(*) FROM orders UNION ALL SELECT ''historical_invoices'', COUNT(*) FROM historical_invoices UNION ALL SELECT ''predicted_orders'', COUNT(*) FROM predicted_orders;\")",
+      "Bash(gcloud config get-value:*)",
+      "Bash(gcloud services enable:*)",
+      "Bash(gcloud auth:*)",
+      "Bash(gcloud config set:*)",
+      "Bash(gcloud builds submit:*)"
     ],
     "deny": []
   }

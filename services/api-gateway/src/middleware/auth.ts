@@ -33,7 +33,7 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     }
 
     // Use a default secret for now - in production this should be from environment
-    const secret = process.env.JWT_SECRET || 'your-secret-key';
+    const secret = process.env.JWT_SECRET || 'local-dev-secret-change-in-production';
 
     jwt.verify(token, secret, (err: any, decoded: any) => {
       if (err) {
@@ -64,7 +64,7 @@ export const optionalAuth = (req: AuthenticatedRequest, res: Response, next: Nex
     return next(); // Continue without authentication
   }
 
-  const secret = process.env.JWT_SECRET || 'your-secret-key';
+  const secret = process.env.JWT_SECRET || 'local-dev-secret-change-in-production';
 
   try {
     const decoded = jwt.verify(token, secret) as AuthenticatedRequest['user'];

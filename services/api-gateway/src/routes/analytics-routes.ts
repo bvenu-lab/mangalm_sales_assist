@@ -48,8 +48,8 @@ export function createAnalyticsRoutes(): Router {
           COALESCE(dm.revenue, 0) as revenue,
           COALESCE(dm.unique_stores, 0) as stores,
           COALESCE(dm.avg_order_value, 0) as avg_order_value,
-          -- Add a target line (simple calculation for demo)
-          COALESCE(dm.revenue * 1.1, 50000) as target
+          -- No mock target - only show real data
+          0 as target
         FROM date_series ds
         LEFT JOIN daily_metrics dm ON ds.date = dm.date
         ORDER BY ds.date

@@ -19,6 +19,12 @@ import { rateLimit } from '../middleware/rate-limit';
 import { auditLog } from '../middleware/audit';
 import axios from 'axios';
 import { Pool } from 'pg';
+import multer from 'multer';
+import csv from 'csv-parse';
+import * as XLSX from 'xlsx';
+import fs from 'fs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -34,6 +40,39 @@ const pool = new Pool({
 
 // Configuration for document processor service
 const DOCUMENT_PROCESSOR_BASE_URL = process.env.DOCUMENT_PROCESSOR_URL || 'http://localhost:3002';
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'temp-uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    cb(null, `import-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedTypes.includes(file.mimetype) || ['.csv', '.xlsx', '.xls'].includes(fileExtension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+    }
+  }
+});
 
 /**
  * Helper function to handle document processor API calls
@@ -806,68 +845,202 @@ router.get('/orders/pending/history',
   }
 );
 
+// Clear all orders route temporarily removed for GCP deployment
+
 /**
- * Clear all orders - DESTRUCTIVE ADMIN OPERATION
+ * Import orders from CSV/Excel file
  */
-router.delete('/orders/clear-all',
-  authorizeRoles(['admin']),
+router.post('/orders/import',
+  authenticateToken,
+  upload.single('file'),
   async (req: Request, res: Response) => {
+    let tempFilePath: string | null = null;
+    
     try {
-      logger.warn('Admin initiated clear all orders operation', {
-        userId: (req as any).user?.id,
-        username: (req as any).user?.username,
-        timestamp: new Date().toISOString()
-      });
-
-      // Get order count before clearing
-      const countQuery = 'SELECT COUNT(*) as count FROM orders';
-      const countResult = await executeQuery(countQuery, []);
-      const orderCount = parseInt(countResult.rows[0]?.count || '0');
-
-      if (orderCount === 0) {
-        return res.json({
-          success: true,
-          message: 'No orders to clear',
-          data: {
-            ordersDeleted: 0,
-            timestamp: new Date().toISOString()
-          }
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file uploaded'
         });
       }
 
-      // Delete all orders
-      const deleteQuery = 'DELETE FROM orders';
-      await executeQuery(deleteQuery, []);
-
-      logger.warn('All orders cleared successfully', {
-        ordersDeleted: orderCount,
-        userId: (req as any).user?.id,
-        username: (req as any).user?.username,
-        timestamp: new Date().toISOString()
+      tempFilePath = req.file.path;
+      const fileExtension = path.extname(req.file.originalname).toLowerCase();
+      
+      logger.info('Processing order import file', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        type: fileExtension
       });
 
+      let orders: any[] = [];
+
+      // Parse file based on type
+      if (fileExtension === '.csv') {
+        // Parse CSV file
+        const fileContent = fs.readFileSync(tempFilePath, 'utf-8');
+        const parser = csv.parse({
+          columns: true,
+          skip_empty_lines: true,
+          trim: true
+        });
+
+        orders = await new Promise((resolve, reject) => {
+          const results: any[] = [];
+          parser.on('data', (data) => results.push(data));
+          parser.on('error', reject);
+          parser.on('end', () => resolve(results));
+          parser.write(fileContent);
+          parser.end();
+        });
+      } else if (['.xlsx', '.xls'].includes(fileExtension)) {
+        // Parse Excel file
+        const workbook = XLSX.readFile(tempFilePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        orders = XLSX.utils.sheet_to_json(worksheet);
+      } else {
+        throw new Error('Unsupported file format');
+      }
+
+      if (orders.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No data found in file'
+        });
+      }
+
+      // Group orders by order_number
+      const orderGroups = new Map<string, any[]>();
+      for (const row of orders) {
+        const orderNumber = row.order_number || `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        if (!orderGroups.has(orderNumber)) {
+          orderGroups.set(orderNumber, []);
+        }
+        orderGroups.get(orderNumber)?.push(row);
+      }
+
+      let processedCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      // Process each order group
+      for (const [orderNumber, items] of orderGroups) {
+        try {
+          // Extract common order info from first item
+          const firstItem = items[0];
+          const storeId = firstItem.store_id || '4261931000001048015'; // Default store if not provided
+          const customerName = firstItem.customer_name || 'CSV Import Customer';
+          const customerPhone = firstItem.customer_phone || '';
+          const customerEmail = firstItem.customer_email || '';
+          
+          // Build items array
+          const orderItems = items.map(item => ({
+            productName: item.product_name || item.productName || 'Unknown Product',
+            quantity: parseInt(item.quantity || '1'),
+            unitPrice: parseFloat(item.unit_price || item.unitPrice || '0'),
+            totalPrice: parseFloat(item.total_price || item.totalPrice || '0') || 
+                       (parseInt(item.quantity || '1') * parseFloat(item.unit_price || item.unitPrice || '0'))
+          }));
+
+          // Calculate totals
+          const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+          const taxRate = 0.18; // 18% GST
+          const taxAmount = subtotal * taxRate;
+          const totalAmount = subtotal + taxAmount;
+          const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+
+          // Insert order into database
+          const insertQuery = `
+            INSERT INTO orders (
+              id, order_number, store_id, customer_name, customer_phone, customer_email,
+              items, item_count, total_quantity, subtotal_amount, tax_amount, total_amount,
+              totals, status, source, created_by, notes, created_at, updated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6,
+              $7, $8, $9, $10, $11, $12,
+              $13, $14, $15, $16, $17, NOW(), NOW()
+            )
+          `;
+
+          const orderId = uuidv4();
+          const values = [
+            orderId,
+            orderNumber,
+            storeId,
+            customerName,
+            customerPhone,
+            customerEmail,
+            JSON.stringify(orderItems),
+            orderItems.length,
+            totalQuantity,
+            subtotal,
+            taxAmount,
+            totalAmount,
+            JSON.stringify({ subtotal, tax: taxAmount, total: totalAmount }),
+            'pending_review',
+            'csv_import',
+            (req as any).user?.username || 'import',
+            firstItem.notes || `Imported from ${req.file?.originalname}`
+          ];
+
+          await pool.query(insertQuery, values);
+          processedCount++;
+
+          logger.info('Order imported successfully', {
+            orderId,
+            orderNumber,
+            itemCount: orderItems.length,
+            totalAmount
+          });
+
+        } catch (error: any) {
+          failedCount++;
+          errors.push(`Order ${orderNumber}: ${error.message}`);
+          logger.error('Failed to import order', {
+            orderNumber,
+            error: error.message
+          });
+        }
+      }
+
+      // Clean up temp file
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+
+      // Return results
+      const success = processedCount > 0;
       res.json({
-        success: true,
-        message: `Successfully cleared all order history`,
+        success,
+        message: success 
+          ? `Successfully imported ${processedCount} order(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}`
+          : 'Failed to import any orders',
+        processedCount,
+        failedCount,
+        errors: errors.slice(0, 10), // Limit errors returned
         data: {
-          ordersDeleted: orderCount,
-          timestamp: new Date().toISOString(),
-          note: 'Dashboard charts will now show empty data until new orders are added'
+          filename: req.file.originalname,
+          totalRows: orders.length,
+          totalOrders: orderGroups.size,
+          timestamp: new Date().toISOString()
         }
       });
 
     } catch (error: any) {
-      logger.error('Failed to clear all orders', {
+      logger.error('CSV/Excel import failed', {
         error: error.message,
-        stack: error.stack,
-        userId: (req as any).user?.id,
-        username: (req as any).user?.username,
-        timestamp: new Date().toISOString()
+        stack: error.stack
       });
+
+      // Clean up temp file on error
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
 
       res.status(500).json({
         success: false,
-        error: 'Failed to clear orders',
+        error: 'Import failed',
         message: error.message
       });
     }

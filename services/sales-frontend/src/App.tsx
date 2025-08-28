@@ -19,6 +19,7 @@ const CallListPage = lazy(() => import('./pages/calls/CallListPage'));
 const OrderCreatePage = lazy(() => import('./pages/orders/OrderCreatePage'));
 const OrderDetailPage = lazy(() => import('./pages/orders/OrderDetailPage'));
 const OrderHistoryPage = lazy(() => import('./pages/orders/OrderHistoryPage'));
+const ImportOrdersPage = lazy(() => import('./pages/orders/ImportOrdersPage'));
 const PerformancePage = lazy(() => import('./pages/performance/PerformancePage'));
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
@@ -58,6 +59,7 @@ const App: React.FC = () => {
             <Route path="/stores/:id" element={<StoreDetailPage />} />
             <Route path="/calls" element={<CallListPage />} />
             <Route path="/orders/create" element={<OrderCreatePage />} />
+            <Route path="/orders/import" element={<ImportOrdersPage />} />
             <Route path="/orders/:id" element={<OrderDetailPage />} />
             <Route path="/orders" element={<OrderHistoryPage />} />
             <Route path="/invoices/:id" element={<NotFoundPage />} /> {/* Placeholder for future InvoiceDetailPage */}

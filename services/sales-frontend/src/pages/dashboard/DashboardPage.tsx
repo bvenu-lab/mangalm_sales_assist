@@ -141,44 +141,9 @@ const DashboardPage: React.FC = () => {
           }
         }
         
-        // If still no orders and we're in development, add mock data for testing
-        if (recentOrdersData.length === 0 && process.env.NODE_ENV === 'development') {
-          console.log('[Dashboard] No orders from API, using mock data for development');
-          // Query the database directly to get real orders
-          try {
-            // Use the mock data based on what we know is in the database
-            recentOrdersData = [
-              {
-                id: '39bad09b-5786-4401-a678-84a451fcafaf',
-                order_number: 'ORD-1755894754493-07TZK',
-                store_id: '4261931000001048015',
-                store: { id: '4261931000001048015', name: 'Rajesh Stores', city: 'Delhi' },
-                customer_name: 'Document Upload Customer',
-                total_amount: 3068,
-                item_count: 3,
-                source: 'document',
-                status: 'pending_review',
-                extraction_confidence: 0.95,
-                created_at: new Date().toISOString()
-              },
-              {
-                id: 'f4f628aa-1d93-4166-8de7-42142d89cb6f',
-                order_number: 'ORD-1755894495352-OFOBJ',
-                store_id: '4261931000001048015',
-                store: { id: '4261931000001048015', name: 'Rajesh Stores', city: 'Delhi' },
-                customer_name: 'Document Upload Customer',
-                total_amount: 3068,
-                item_count: 3,
-                source: 'document',
-                status: 'pending_review',
-                extraction_confidence: 0.95,
-                created_at: new Date(Date.now() - 3600000).toISOString()
-              }
-            ];
-            console.log('[Dashboard] Using mock recent orders:', recentOrdersData.length);
-          } catch (e) {
-            console.error('[Dashboard] Failed to create mock data:', e);
-          }
+        // No mock data - keep the array empty if no real data is available
+        if (recentOrdersData.length === 0) {
+          console.log('[Dashboard] No orders found from API');
         }
         
         const dashboardData = {

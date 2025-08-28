@@ -31,6 +31,7 @@ import {
   Security as SecurityIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
+import apiGatewayClient from '../../services/api-gateway-client';
 
 const SettingsPage: React.FC = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -49,20 +50,8 @@ const SettingsPage: React.FC = () => {
     setError(null);
 
     try {
-      // Call API to clear all orders
-      const response = await fetch('/api/orders/clear-all', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to clear orders: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      // Call API to clear all orders using the API gateway client
+      const result = await apiGatewayClient.delete('/api/orders/clear-all');
       console.log('Clear orders result:', result);
 
       setClearSuccess(true);

@@ -128,7 +128,7 @@ router.get('/product-alerts/summary', async (req: Request, res: Response) => {
       success: true,
       data: {
         summary: result.rows,
-        total_unresolved: result.rows.reduce((sum, row) => sum + (row.unresolved_count || 0), 0)
+        total_unresolved: result.rows.reduce((sum: number, row: any) => sum + (row.unresolved_count || 0), 0)
       }
     });
 
@@ -382,8 +382,8 @@ router.post('/products/check-prediction',
       const query = 'SELECT * FROM get_unknown_products($1::jsonb)';
       const result = await executeQuery(query, [JSON.stringify(items)]);
 
-      const unknownProducts = result.rows.filter(r => r.is_unknown);
-      const validProducts = result.rows.filter(r => !r.is_unknown);
+      const unknownProducts = result.rows.filter((r: any) => r.is_unknown);
+      const validProducts = result.rows.filter((r: any) => !r.is_unknown);
 
       res.json({
         success: true,

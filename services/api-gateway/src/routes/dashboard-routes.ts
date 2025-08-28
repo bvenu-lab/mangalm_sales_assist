@@ -15,6 +15,16 @@ export function createDashboardRoutes(): Router {
       const storeId = req.query.storeId as string;
       logger.info('Fetching prioritized call list', { limit, storeId });
       
+      // First check if we have any invoices at all - if not, return empty
+      const invoiceCheck = await db.query('SELECT COUNT(*) as count FROM historical_invoices');
+      if (invoiceCheck.rows[0].count === '0') {
+        return res.json({
+          success: true,
+          data: [],
+          total: 0
+        });
+      }
+      
       // Query stores with their last order information and calculate priority
       const query = `
         WITH store_orders AS (
@@ -911,66 +921,70 @@ export function createDashboardRoutes(): Router {
     try {
       logger.info('Fetching performance summary');
       
-      // Calculate performance metrics from actual data
+      // Calculate performance metrics from ACTUAL ORDERS table (not historical invoices)
       const metricsQuery = `
-        WITH recent_period AS (
+        WITH today_metrics AS (
           SELECT 
             COUNT(DISTINCT id) as orders_count,
             COUNT(DISTINCT store_id) as stores_served,
-            SUM(total_amount) as total_revenue,
-            AVG(total_amount) as avg_order_value
-          FROM historical_invoices
-          WHERE invoice_date >= NOW() - INTERVAL '30 days'
+            COALESCE(SUM(total_amount), 0) as total_revenue,
+            COALESCE(AVG(total_amount), 0) as avg_order_value
+          FROM orders
+          WHERE DATE(created_at) = CURRENT_DATE
         ),
-        previous_period AS (
+        recent_period AS (
           SELECT 
-            SUM(total_amount) as prev_revenue,
-            AVG(total_amount) as prev_avg_order_value
-          FROM historical_invoices
-          WHERE invoice_date >= NOW() - INTERVAL '60 days'
-            AND invoice_date < NOW() - INTERVAL '30 days'
+            COUNT(DISTINCT id) as orders_count_30d,
+            COUNT(DISTINCT store_id) as stores_served_30d,
+            COALESCE(SUM(total_amount), 0) as total_revenue_30d,
+            COALESCE(AVG(total_amount), 0) as avg_order_value_30d
+          FROM orders
+          WHERE created_at >= NOW() - INTERVAL '30 days'
         ),
         daily_trend AS (
           SELECT 
-            DATE(invoice_date) as date,
-            SUM(total_amount) as daily_revenue
-          FROM historical_invoices
-          WHERE invoice_date >= NOW() - INTERVAL '7 days'
-          GROUP BY DATE(invoice_date)
+            DATE(created_at) as date,
+            COALESCE(SUM(total_amount), 0) as daily_revenue
+          FROM orders
+          WHERE created_at >= NOW() - INTERVAL '7 days'
+          GROUP BY DATE(created_at)
           ORDER BY date
         )
         SELECT 
-          rp.stores_served as calls_completed,
-          rp.orders_count as orders_placed,
-          CASE 
-            WHEN pp.prev_avg_order_value > 0 AND rp.avg_order_value > pp.prev_avg_order_value 
-            THEN 0.75 
-            ELSE 0.45 
-          END as upsell_success_rate,
-          COALESCE(rp.avg_order_value, 0) as average_order_value,
-          COALESCE(rp.total_revenue, 0) as total_revenue,
-          json_agg(
+          -- Use today's metrics for the KPI cards
+          COALESCE(tm.orders_count, 0) as calls_completed,
+          COALESCE(tm.orders_count, 0) as orders_placed,
+          0.0 as upsell_success_rate,  -- No mock data - only real upsell tracking
+          COALESCE(tm.avg_order_value, 0) as average_order_value,
+          COALESCE(tm.total_revenue, 0) as total_revenue,
+          COALESCE(json_agg(
             json_build_object(
               'date', dt.date,
               'value', dt.daily_revenue
             ) ORDER BY dt.date
-          ) as performance_trend
-        FROM recent_period rp
-        CROSS JOIN previous_period pp
+          ) FILTER (WHERE dt.date IS NOT NULL), '[]'::json) as performance_trend
+        FROM today_metrics tm
+        CROSS JOIN recent_period rp
         LEFT JOIN daily_trend dt ON true
-        GROUP BY rp.stores_served, rp.orders_count, rp.avg_order_value, 
-                 rp.total_revenue, pp.prev_avg_order_value
+        GROUP BY tm.orders_count, tm.avg_order_value, 
+                 tm.total_revenue
       `;
       
       const topProductsQuery = `
+        -- Get top products from actual orders, not invoices
+        WITH order_items AS (
+          SELECT 
+            COALESCE(item->>'product_name', item->>'productName', 'Unknown Product') as product_name,
+            COALESCE((item->>'quantity')::numeric, 0) as quantity
+          FROM orders o
+          CROSS JOIN LATERAL jsonb_array_elements(o.items) AS item
+          WHERE o.created_at >= NOW() - INTERVAL '30 days'
+        )
         SELECT 
-          p.name,
-          SUM(ii.quantity) as units
-        FROM invoice_items ii
-        JOIN products p ON ii.product_id = p.id
-        JOIN historical_invoices hi ON ii.invoice_id = hi.id
-        WHERE hi.invoice_date >= NOW() - INTERVAL '30 days'
-        GROUP BY p.name
+          product_name as name,
+          SUM(quantity) as units
+        FROM order_items
+        GROUP BY product_name
         ORDER BY units DESC
         LIMIT 3
       `;
