@@ -38,10 +38,10 @@ RUN apt-get update && \
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3004
+ENV PORT=3006
 
 # Expose the port
 EXPOSE 3006
 
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/simple-server.js"]

@@ -10,44 +10,64 @@ options:
   substitutionOption: 'ALLOW_LOOSE'
 
 steps:
-  # Build and deploy Sales Frontend
+  # Build all Docker images first (in parallel)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build',
-           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA',
-           '-f', 'services/sales-frontend/Dockerfile',
-           './services/sales-frontend']
-  
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push',
-           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA']
-  
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      ['run', 'deploy', 'mangalm-sales-frontend',
-       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA',
-       '--region', '${_REGION}',
-       '--allow-unauthenticated',
-       '--port', '3000',
-       '--cpu', '1',
-       '--memory', '512Mi',
-       '--concurrency', '80',
-       '--min-instances', '0',
-       '--max-instances', '10',
-       '--set-env-vars', 'REACT_APP_API_GATEWAY_URL=https://mangalm-api-gateway-${_ENV}.run.app']
-
-  # Build and deploy API Gateway
-  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api-gateway'
     args: ['build',
            '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA',
            '-f', 'services/api-gateway/Dockerfile',
            './services/api-gateway']
   
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-ai-prediction'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA',
+           '-f', 'services/ai-prediction-service/Dockerfile',
+           './services/ai-prediction-service']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-document-processor'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
+           '-f', 'services/document-processor/Dockerfile',
+           './services/document-processor']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-sales-frontend'
+    args: ['build',
+           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA',
+           '-f', 'services/sales-frontend/Dockerfile',
+           './services/sales-frontend']
+
+  # Push all images (in parallel)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api-gateway'
+    waitFor: ['build-api-gateway']
     args: ['push',
            '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api-gateway:$SHORT_SHA']
   
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-ai-prediction'
+    waitFor: ['build-ai-prediction']
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-document-processor'
+    waitFor: ['build-document-processor']
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-sales-frontend'
+    waitFor: ['build-sales-frontend']
+    args: ['push',
+           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA']
+
+  # Deploy backend services first
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-api-gateway'
+    waitFor: ['push-api-gateway']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
@@ -64,18 +84,9 @@ steps:
        '--set-secrets', 'JWT_SECRET=jwt-secret:latest,DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Build and deploy AI Prediction Service
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build',
-           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA',
-           '-f', 'services/ai-prediction-service/Dockerfile',
-           './services/ai-prediction-service']
-  
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push',
-           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/ai-prediction:$SHORT_SHA']
-  
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-ai-prediction'
+    waitFor: ['push-ai-prediction']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-ai-prediction',
@@ -92,7 +103,59 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Build and deploy Zoho Integration Service - DISABLED FOR NOW
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-document-processor'
+    waitFor: ['push-document-processor']
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-document-processor',
+       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
+       '--region', '${_REGION}',
+       '--no-allow-unauthenticated',
+       '--port', '3008',
+       '--cpu', '2',
+       '--memory', '2Gi',
+       '--concurrency', '20',
+       '--min-instances', '0',
+       '--max-instances', '10',
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest,OPENAI_API_KEY=openai-api-key:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
+
+  # Get the API Gateway URL
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'get-api-gateway-url'
+    waitFor: ['deploy-api-gateway']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        API_URL=$(gcloud run services describe mangalm-api-gateway --region=${_REGION} --format='value(status.url)')
+        echo "API Gateway URL: $$API_URL"
+        echo $$API_URL > /workspace/api-gateway-url.txt
+
+  # Deploy frontend with the API Gateway URL
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-sales-frontend'
+    waitFor: ['push-sales-frontend', 'get-api-gateway-url']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        API_URL=$(cat /workspace/api-gateway-url.txt)
+        gcloud run deploy mangalm-sales-frontend \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA \
+          --region=${_REGION} \
+          --allow-unauthenticated \
+          --port=3000 \
+          --cpu=1 \
+          --memory=512Mi \
+          --concurrency=80 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --set-env-vars="REACT_APP_API_GATEWAY_URL=$$API_URL"
+
+  # Zoho Integration Service - DISABLED FOR NOW
   # - name: 'gcr.io/cloud-builders/docker'
   #   args: ['build',
   #          '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/zoho-integration:$SHORT_SHA',
@@ -119,34 +182,6 @@ steps:
   #      '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
   #      '--set-secrets', 'DB_PASSWORD=db-password:latest',
   #      '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
-
-  # Build and deploy Document Processor Service
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build',
-           '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
-           '-f', 'services/document-processor/Dockerfile',
-           './services/document-processor']
-  
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push',
-           '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA']
-  
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      ['run', 'deploy', 'mangalm-document-processor',
-       '--image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/document-processor:$SHORT_SHA',
-       '--region', '${_REGION}',
-       '--no-allow-unauthenticated',
-       '--port', '3008',
-       '--cpu', '2',
-       '--memory', '2Gi',
-       '--concurrency', '20',
-       '--min-instances', '0',
-       '--max-instances', '10',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
-       '--set-secrets', 'DB_PASSWORD=db-password:latest,OPENAI_API_KEY=openai-api-key:latest',
-       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/sales-frontend:$SHORT_SHA'
