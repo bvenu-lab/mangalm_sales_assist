@@ -172,8 +172,15 @@ router.get(
       success: true,
       data: result
     });
-  })
-);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error in route handler', { error: errorMessage });
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
 
 // Get all processing results for a store with enhanced filtering
 router.get(
@@ -352,8 +359,15 @@ router.post(
         responseTime
       }
     });
-  })
-);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error in route handler', { error: errorMessage });
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
 
 // Add enterprise utility methods
 function maskSensitiveData(data: any): any {
@@ -379,8 +393,15 @@ router.get(
       service: 'document-processor-processing',
       database: dbConnection ? 'connected' : 'disconnected'
     });
-  })
-);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error in route handler', { error: errorMessage });
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
 
 // Apply global error handler
 router.use(errorHandler.globalHandler);
