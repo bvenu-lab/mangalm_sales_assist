@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Local CSV Import</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .order-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        pre {
+            background: #333;
+            color: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Local CSV Import</h1>
+    <p>This will load the CSV file directly from: <code>C:\code\mangalm\user_journey\Invoices_Mangalam .csv</code></p>
+    
+    <button onclick="loadLocalCSV()">Load Local CSV</button>
+    <button onclick="viewOrders()">View Loaded Orders</button>
+    <button onclick="clearStorage()">Clear Local Storage</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function loadLocalCSV() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Loading CSV from filesystem...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3007/api/orders/import-local', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Store in localStorage
+                    localStorage.setItem('localOrders', JSON.stringify(data.orders));
+                    localStorage.setItem('lastImportTime', new Date().toISOString());
+                    
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h2>Success!</h2>
+                            <p>Loaded ${data.processedCount} orders from ${data.totalRows} rows</p>
+                            <p>Data stored in localStorage</p>
+                        </div>
+                        <h3>First 5 Orders:</h3>
+                        <div>
+                            ${data.orders.slice(0, 5).map(order => `
+                                <div class="order-item">
+                                    <strong>${order.orderNumber}</strong> - ${order.customerName}<br>
+                                    Items: ${order.itemCount}, Total: $${order.totalAmount.toFixed(2)}<br>
+                                    Date: ${order.invoiceDate}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p>... and ${data.orders.length - 5} more orders</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Error: ${data.message || 'Failed to load CSV'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Network Error: ${error.message}</div>`;
+            }
+        }
+        
+        function viewOrders() {
+            const resultDiv = document.getElementById('result');
+            const orders = localStorage.getItem('localOrders');
+            
+            if (orders) {
+                const ordersData = JSON.parse(orders);
+                const lastImport = localStorage.getItem('lastImportTime');
+                
+                resultDiv.innerHTML = `
+                    <h2>Orders in Local Storage</h2>
+                    <p>Total: ${ordersData.length} orders</p>
+                    <p>Last imported: ${lastImport ? new Date(lastImport).toLocaleString() : 'Unknown'}</p>
+                    <h3>Sample Data:</h3>
+                    <pre>${JSON.stringify(ordersData.slice(0, 2), null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.innerHTML = '<p>No orders in localStorage. Click "Load Local CSV" first.</p>';
+            }
+        }
+        
+        function clearStorage() {
+            localStorage.removeItem('localOrders');
+            localStorage.removeItem('lastImportTime');
+            document.getElementById('result').innerHTML = '<p>Local storage cleared!</p>';
+        }
+    </script>
+</body>
+</html>

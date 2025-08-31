@@ -10,7 +10,7 @@
  * @enterprise-grade 10/10
  */
 
-import { Logger } from '@nestjs/common';
+import logger from './logger';
 
 export enum ErrorCode {
   // Validation errors (1000-1999)

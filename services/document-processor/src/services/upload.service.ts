@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { config } from '../config';
 import { AppDataSource } from '../database/connection';
 import { DocumentUpload, ProcessingStatus, DocumentType } from '../models/document-upload.entity';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import * as winston from 'winston';
 
 const logger = winston.createLogger({
@@ -78,7 +78,7 @@ export class UploadService {
 
       // Check for duplicate uploads
       const existingDocument = await this.documentRepository.findOne({
-        where: { checksum, deletedAt: null }
+        where: { checksum, deletedAt: IsNull() }
       });
 
       if (existingDocument) {
@@ -134,13 +134,13 @@ export class UploadService {
 
   async getDocumentById(id: string): Promise<DocumentUpload | null> {
     return this.documentRepository.findOne({
-      where: { id, deletedAt: null }
+      where: { id, deletedAt: IsNull() }
     });
   }
 
   async getDocumentsByStore(storeId: string): Promise<DocumentUpload[]> {
     return this.documentRepository.find({
-      where: { storeId, deletedAt: null },
+      where: { storeId, deletedAt: IsNull() },
       order: { createdAt: 'DESC' }
     });
   }
@@ -200,7 +200,7 @@ export class UploadService {
     return this.documentRepository.find({
       where: { 
         processingStatus: ProcessingStatus.PENDING,
-        deletedAt: null 
+        deletedAt: IsNull() 
       },
       order: { 
         priority: 'DESC',
@@ -300,18 +300,18 @@ export class UploadService {
   }
 
   async getDocumentStats(): Promise<any> {
-    const total = await this.documentRepository.count({ where: { deletedAt: null } });
+    const total = await this.documentRepository.count({ where: { deletedAt: IsNull() } });
     const pending = await this.documentRepository.count({ 
-      where: { processingStatus: ProcessingStatus.PENDING, deletedAt: null } 
+      where: { processingStatus: ProcessingStatus.PENDING, deletedAt: IsNull() } 
     });
     const processing = await this.documentRepository.count({ 
-      where: { processingStatus: ProcessingStatus.PROCESSING, deletedAt: null } 
+      where: { processingStatus: ProcessingStatus.PROCESSING, deletedAt: IsNull() } 
     });
     const completed = await this.documentRepository.count({ 
-      where: { processingStatus: ProcessingStatus.COMPLETED, deletedAt: null } 
+      where: { processingStatus: ProcessingStatus.COMPLETED, deletedAt: IsNull() } 
     });
     const failed = await this.documentRepository.count({ 
-      where: { processingStatus: ProcessingStatus.FAILED, deletedAt: null } 
+      where: { processingStatus: ProcessingStatus.FAILED, deletedAt: IsNull() } 
     });
 
     return {

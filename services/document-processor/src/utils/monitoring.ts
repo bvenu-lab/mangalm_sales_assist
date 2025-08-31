@@ -117,6 +117,33 @@ class MonitoringService {
 
     return status;
   }
+
+  // Add missing methods for compatibility
+  incrementCounter(metric: string, value: number = 1) {
+    logger.debug(`Metric counter: ${metric} += ${value}`);
+    // Track specific metrics
+    if (metric.includes('error')) {
+      this.metrics.errorCount += value;
+    } else if (metric.includes('request')) {
+      this.metrics.requestCount += value;
+    }
+  }
+
+  recordTiming(metric: string, duration: number) {
+    logger.debug(`Metric timing: ${metric} = ${duration}ms`);
+    this.responseTimes.push(duration);
+    if (this.responseTimes.length > 1000) {
+      this.responseTimes.shift();
+    }
+    this.updateAverageResponseTime();
+  }
+
+  private updateAverageResponseTime() {
+    if (this.responseTimes.length > 0) {
+      this.metrics.averageResponseTime = 
+        this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+    }
+  }
 }
 
 export const monitoring = new MonitoringService();

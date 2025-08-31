@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Bulk Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .upload-section {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Bulk Upload to API Gateway</h1>
+    
+    <div class="info" style="background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 10px; margin: 10px 0; border-radius: 4px;">
+        <strong>Ready!</strong> Authentication has been disabled for local testing. You can now upload your CSV file directly.
+    </div>
+    
+    <div class="upload-section">
+        <h2>Upload CSV File</h2>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+        <br><br>
+        <button onclick="uploadFile()">Upload to API</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Uploading...</p>';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // First try without auth token
+                console.log('Uploading file:', file.name);
+                
+                const response = await fetch('http://localhost:3007/api/orders/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                console.log('Response:', result);
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>Success!</h3>
+                            <p>${result.message}</p>
+                            <p>Processed: ${result.processedCount} orders</p>
+                            <p>Failed: ${result.failedCount} orders</p>
+                            ${result.errors && result.errors.length > 0 ? 
+                                `<p>Errors:<br>${result.errors.join('<br>')}</p>` : ''}
+                            <h4>Response Details:</h4>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>Error</h3>
+                            <p>${result.message || 'Upload failed'}</p>
+                            <h4>Response Details:</h4>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>Network Error</h3>
+                        <p>${error.message}</p>
+                        <p>Make sure the API Gateway is running on port 3007</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

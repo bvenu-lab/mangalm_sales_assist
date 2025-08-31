@@ -379,3 +379,49 @@ export class Order {
     }
   }
 }
+
+// Additional types for validation
+export interface OrderFormData {
+  orderNumber?: string;
+  storeId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  items: OrderItem[];
+  shippingAddress?: OrderAddress;
+  billingAddress?: OrderAddress;
+  notes?: string;
+  totals: OrderTotals;
+  subtotalAmount?: number;
+  taxAmount?: number;
+  totalAmount?: number;
+  orderDate?: Date;
+  requestedDeliveryDate?: Date;
+  extractionConfidence?: number;
+  manualVerificationRequired?: boolean;
+  manuallyVerified?: boolean;
+  source?: string;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+  param?: string;
+  value?: any;
+  severity?: string;
+}
+
+export interface QualityAssessment {
+  score: number;
+  issues: ValidationError[];
+  warnings: string[];
+  suggestions: Suggestion[];
+}
+
+export interface Suggestion {
+  type: string;
+  message: string;
+  field?: string;
+  suggestedValue?: any;
+}

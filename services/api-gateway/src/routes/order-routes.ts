@@ -28,11 +28,13 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
+// In-memory storage for local testing
+let inMemoryOrders: any[] = [];
 
 // Database connection
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: parseInt(process.env.DB_PORT || '3432'),
   database: process.env.DB_NAME || 'mangalm_sales',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres'
@@ -512,6 +514,41 @@ router.put('/orders/:id',
 );
 
 /**
+ * Clear all orders - used by Settings page
+ */
+router.delete('/orders/clear-all',
+  // Allow public access for testing, or require admin role in production
+  async (req: Request, res: Response) => {
+    try {
+      logger.info('Clearing all orders from database and memory');
+      
+      // Clear from database
+      await pool.query('DELETE FROM invoice_items');
+      await pool.query('DELETE FROM historical_invoices');
+      await pool.query('DELETE FROM predicted_order_items');
+      await pool.query('DELETE FROM predicted_orders');
+      await pool.query('DELETE FROM call_prioritization');
+      await pool.query('DELETE FROM orders');
+      
+      logger.info('All orders cleared successfully');
+      
+      res.json({
+        success: true,
+        message: 'All orders have been cleared',
+        clearedFromDatabase: true
+      });
+    } catch (error: any) {
+      logger.error('Failed to clear orders:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to clear orders',
+        details: error.message
+      });
+    }
+  }
+);
+
+/**
  * Delete order
  */
 router.delete('/orders/:id',
@@ -814,6 +851,78 @@ router.post('/orders/validate',
 );
 
 /**
+ * Get order history - all orders with pagination
+ */
+router.get('/orders/history',
+  // Remove auth requirement for now to match other endpoints
+  async (req: Request, res: Response) => {
+    try {
+      logger.info('Fetching order history');
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      // Get orders from database
+      const ordersQuery = `
+        SELECT 
+          id,
+          order_number,
+          store_id,
+          customer_name,
+          customer_phone,
+          customer_email,
+          items,
+          item_count,
+          total_quantity,
+          subtotal_amount,
+          tax_amount,
+          total_amount,
+          status,
+          source,
+          notes,
+          created_at,
+          updated_at
+        FROM orders 
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2
+      `;
+      
+      const countQuery = 'SELECT COUNT(*) as total FROM orders';
+      
+      const [ordersResult, countResult] = await Promise.all([
+        pool.query(ordersQuery, [limit, offset]),
+        pool.query(countQuery)
+      ]);
+      
+      const orders = ordersResult.rows.map(order => ({
+        ...order,
+        items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+      }));
+      
+      const total = parseInt(countResult.rows[0].total);
+      
+      res.json({
+        success: true,
+        data: {
+          orders,
+          total,
+          page: Math.floor(offset / limit) + 1,
+          limit,
+          hasMore: offset + limit < total
+        }
+      });
+    } catch (error: any) {
+      logger.error('Failed to fetch order history', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch order history',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
  * Get pending orders history
  */
 router.get('/orders/pending/history',
@@ -851,7 +960,7 @@ router.get('/orders/pending/history',
  * Import orders from CSV/Excel file
  */
 router.post('/orders/import',
-  authenticateToken,
+  // Authentication disabled for local CSV import testing
   upload.single('file'),
   async (req: Request, res: Response) => {
     let tempFilePath: string | null = null;
@@ -1048,6 +1157,41 @@ router.post('/orders/import',
           ];
 
           await pool.query(insertQuery, values);
+          
+          // Also insert into historical_invoices table for AI predictions
+          try {
+            const historicalInsertQuery = `
+              INSERT INTO historical_invoices (
+                id, store_id, invoice_number, invoice_date, 
+                customer_name, total_amount, item_count, created_at
+              ) VALUES (
+                gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW()
+              )
+              ON CONFLICT (invoice_number) DO NOTHING
+            `;
+            
+            const invoiceDate = firstItem['Invoice Date'] || firstItem['Order Date'] || new Date().toISOString();
+            await pool.query(historicalInsertQuery, [
+              storeId,
+              orderNumber,
+              invoiceDate,
+              customerName,
+              totalAmount,
+              orderItems.length
+            ]);
+            
+            logger.info('Historical invoice record created', {
+              orderNumber,
+              storeId
+            });
+          } catch (histError: any) {
+            logger.warn('Failed to create historical invoice record', {
+              orderNumber,
+              error: histError.message
+            });
+            // Don't fail the main import if historical record fails
+          }
+          
           processedCount++;
 
           logger.info('Order imported successfully', {
@@ -1070,6 +1214,65 @@ router.post('/orders/import',
       // Clean up temp file
       if (tempFilePath && fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
+      }
+
+      // Trigger AI predictions for the imported stores
+      if (processedCount > 0) {
+        try {
+          // Get unique store IDs from imported orders
+          const uniqueStoreIds = new Set<string>();
+          for (const [_, items] of orderGroups) {
+            const storeId = getColumnValue(items[0], 
+              ['store_id', 'Store ID', 'Customer ID'], 
+              '4261931000001048015'
+            );
+            uniqueStoreIds.add(storeId);
+          }
+          
+          // Call AI prediction service for each store
+          const predictionPromises = Array.from(uniqueStoreIds).map(async (storeId) => {
+            try {
+              const predictionResponse = await axios.post(
+                `http://localhost:3006/api/predictions/order`,
+                {
+                  storeId,
+                  includeItems: true
+                },
+                {
+                  timeout: 10000,
+                  headers: {
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              logger.info('AI predictions generated for store', {
+                storeId,
+                success: predictionResponse.data.success
+              });
+              return { storeId, success: true };
+            } catch (error: any) {
+              logger.error('Failed to generate AI predictions for store', {
+                storeId,
+                error: error.message
+              });
+              return { storeId, success: false, error: error.message };
+            }
+          });
+          
+          // Wait for all predictions to complete (with timeout)
+          const predictionResults = await Promise.allSettled(predictionPromises);
+          const successfulPredictions = predictionResults.filter(r => r.status === 'fulfilled' && (r.value as any).success).length;
+          
+          logger.info('AI predictions triggered', {
+            totalStores: uniqueStoreIds.size,
+            successful: successfulPredictions
+          });
+        } catch (error: any) {
+          logger.error('Failed to trigger AI predictions after import', {
+            error: error.message
+          });
+          // Don't fail the import if predictions fail
+        }
       }
 
       // Return results
@@ -1122,6 +1325,213 @@ router.post('/orders/import',
         details: 'Please ensure your CSV has columns like: Invoice ID, Customer Name, Item Name, Quantity, Item Price, Total'
       });
     }
+  }
+);
+
+// Export the local import handler separately for direct mounting
+export const importLocalHandler = async (req: Request, res: Response) => {
+    try {
+      // Direct path to the CSV file
+      const csvPath = 'C:\\code\\mangalm\\user_journey\\Invoices_Mangalam .csv';
+      
+      logger.info('Loading CSV file directly from filesystem', { path: csvPath });
+      
+      if (!fs.existsSync(csvPath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'CSV file not found',
+          message: `File not found at: ${csvPath}`
+        });
+      }
+
+      const fileContent = fs.readFileSync(csvPath, 'utf-8');
+      
+      // Parse CSV
+      const orders: any[] = await new Promise((resolve, reject) => {
+        const results: any[] = [];
+        const parser = parse({
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          relax_quotes: true,
+          relax_column_count: true
+        });
+        
+        parser.on('readable', function() {
+          let record;
+          while ((record = parser.read()) !== null) {
+            results.push(record);
+          }
+        });
+        
+        parser.on('error', reject);
+        parser.on('end', () => resolve(results));
+        
+        parser.write(fileContent);
+        parser.end();
+      });
+
+      // Group orders by Invoice Number
+      const orderGroups = new Map<string, any[]>();
+      for (const row of orders) {
+        const orderNumber = row['Invoice Number'] || row['Invoice ID'] || `ORD-${Date.now()}`;
+        if (!orderGroups.has(orderNumber)) {
+          orderGroups.set(orderNumber, []);
+        }
+        orderGroups.get(orderNumber)?.push(row);
+      }
+
+      // Process and store in memory
+      inMemoryOrders = [];
+      let processedCount = 0;
+      
+      for (const [orderNumber, items] of orderGroups) {
+        const firstItem = items[0];
+        
+        // Build order items
+        const orderItems = items.map(item => ({
+          productName: item['Item Name'] || 'Unknown Product',
+          quantity: parseInt(item['Quantity'] || '1'),
+          unitPrice: parseFloat(item['Item Price'] || '0'),
+          totalPrice: parseFloat(item['Item Total'] || '0')
+        }));
+
+        // Calculate totals
+        const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const taxAmount = subtotal * 0.18;
+        const totalAmount = subtotal + taxAmount;
+
+        // Create order object
+        const order = {
+          id: uuidv4(),
+          orderNumber,
+          storeId: firstItem['Customer ID'] || '4261931000001048015',
+          customerName: firstItem['Customer Name'] || 'Unknown Customer',
+          customerPhone: firstItem['Shipping Phone'] || '',
+          customerEmail: firstItem['Customer Email'] || '',
+          items: orderItems,
+          itemCount: orderItems.length,
+          totalQuantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
+          subtotalAmount: subtotal,
+          taxAmount,
+          totalAmount,
+          status: 'pending_review',
+          source: 'local_csv',
+          createdAt: new Date().toISOString(),
+          invoiceDate: firstItem['Invoice Date'] || new Date().toISOString()
+        };
+
+        inMemoryOrders.push(order);
+        
+        // Also persist to database
+        try {
+          const insertQuery = `
+            INSERT INTO orders (
+              id, order_number, store_id, customer_name, customer_phone, customer_email,
+              items, item_count, total_quantity, subtotal_amount, tax_amount, total_amount,
+              totals, status, source, created_by, notes, created_at, updated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6,
+              $7, $8, $9, $10, $11, $12,
+              $13, $14, $15, $16, $17, NOW(), NOW()
+            )
+          `;
+
+          const values = [
+            order.id,
+            order.orderNumber,
+            order.storeId,
+            order.customerName,
+            order.customerPhone,
+            order.customerEmail,
+            JSON.stringify(order.items),
+            order.itemCount,
+            order.totalQuantity,
+            order.subtotalAmount,
+            order.taxAmount,
+            order.totalAmount,
+            JSON.stringify({ subtotal: order.subtotalAmount, tax: order.taxAmount, total: order.totalAmount }),
+            order.status,
+            order.source,
+            'local_import',
+            `Imported from local CSV: ${order.invoiceDate}`
+          ];
+
+          await pool.query(insertQuery, values);
+          
+          // Also create historical invoice record
+          const historicalInsertQuery = `
+            INSERT INTO historical_invoices (
+              id, store_id, invoice_number, invoice_date, 
+              customer_name, total_amount, item_count, created_at
+            ) VALUES (
+              gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW()
+            )
+            ON CONFLICT (invoice_number) DO NOTHING
+          `;
+          
+          await pool.query(historicalInsertQuery, [
+            order.storeId,
+            order.orderNumber,
+            order.invoiceDate,
+            order.customerName,
+            order.totalAmount,
+            order.itemCount
+          ]);
+          
+        } catch (dbError: any) {
+          logger.warn('Failed to persist order to database', {
+            orderId: order.id,
+            error: dbError.message
+          });
+          // Don't fail the import if database insert fails
+        }
+        
+        processedCount++;
+      }
+
+      logger.info('CSV import completed', {
+        totalRows: orders.length,
+        ordersCreated: processedCount,
+        inMemoryCount: inMemoryOrders.length
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully imported ${processedCount} orders from local CSV`,
+        processedCount,
+        totalRows: orders.length,
+        orders: inMemoryOrders,
+        data: {
+          filename: 'Invoices_Mangalam .csv',
+          totalOrders: processedCount,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+    } catch (error: any) {
+      logger.error('Local CSV import failed', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to import CSV',
+        message: error.message
+      });
+    }
+  };
+
+// Also register it in the router for consistency
+router.post('/orders/import-local', importLocalHandler);
+
+/**
+ * LOCAL TESTING ONLY - Get all in-memory orders
+ */
+router.get('/orders/local',
+  async (req: Request, res: Response) => {
+    res.json({
+      success: true,
+      orders: inMemoryOrders,
+      count: inMemoryOrders.length
+    });
   }
 );
 

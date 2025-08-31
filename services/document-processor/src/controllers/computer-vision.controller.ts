@@ -31,8 +31,8 @@ import fs from 'fs/promises';
 import { computerVisionService } from '../services/computer-vision.service';
 import { tableDetectionService } from '../services/table-detection.service';
 import { handwritingDetectionService } from '../services/handwriting-detection.service';
-import { logger } from '../utils/logger';
-import { monitoring } from '../utils/monitoring';
+import logger from '../utils/logger';
+import monitoring from '../utils/monitoring';
 import { config } from '../config';
 
 // Job management for async processing
