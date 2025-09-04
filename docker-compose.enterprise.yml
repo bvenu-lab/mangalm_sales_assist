@@ -1,0 +1,237 @@
+version: '3.9'
+
+services:
+  # PostgreSQL 15 - Latest stable with enterprise features
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: mangalm_postgres_primary
+    hostname: postgres-primary
+    environment:
+      POSTGRES_DB: mangalm_sales
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.utf8"
+      # Enterprise settings
+      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: 0.9
+      POSTGRES_WAL_BUFFERS: 16MB
+      POSTGRES_DEFAULT_STATISTICS_TARGET: 100
+      POSTGRES_RANDOM_PAGE_COST: 1.1
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: 200
+      POSTGRES_WORK_MEM: 4MB
+      POSTGRES_MIN_WAL_SIZE: 1GB
+      POSTGRES_MAX_WAL_SIZE: 4GB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/backups:/backups
+    command: >
+      postgres
+      -c shared_preload_libraries='pg_stat_statements'
+      -c pg_stat_statements.track=all
+      -c log_statement='all'
+      -c log_duration=on
+      -c log_min_duration_statement=100
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_temp_files=0
+      -c log_autovacuum_min_duration=0
+      -c log_error_verbosity=default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # Redis 7 - Latest stable with persistence
+  redis-master:
+    image: redis:7-alpine
+    container_name: mangalm_redis_master
+    hostname: redis-master
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --save 300 10
+      --save 900 100
+      --rdbcompression yes
+      --rdbchecksum yes
+      --dir /data
+      --dbfilename dump.rdb
+      --appendonly yes
+      --appendfsync everysec
+      --no-appendfsync-on-rewrite no
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+      --requirepass redis_dev_2024
+      --loglevel warning
+      --timeout 300
+      --tcp-keepalive 300
+      --tcp-backlog 511
+      --databases 16
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mangalm_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mangalm.com
+      PGADMIN_DEFAULT_PASSWORD: pgadmin_dev_2024
+      PGADMIN_CONFIG_SERVER_MODE: 'True'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'True'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: mangalm_redis_commander
+    environment:
+      REDIS_HOSTS: master:redis-master:6379:0:redis_dev_2024
+      HTTP_USER: admin
+      HTTP_PASSWORD: redis_commander_2024
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # Bull Board for queue monitoring (enterprise feature)
+  bull-board:
+    image: deadly0/bull-board:latest
+    container_name: mangalm_bull_board
+    environment:
+      REDIS_HOST: redis-master
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_dev_2024
+      REDIS_USE_TLS: 'false'
+    ports:
+      - "3100:3000"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mangalm_prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+    ports:
+      - "9090:9090"
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mangalm_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: grafana_dev_2024
+      GF_INSTALL_PLUGINS: redis-datasource,redis-app
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3200:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+  # MinIO for S3-compatible object storage (enterprise feature)
+  minio:
+    image: minio/minio:latest
+    container_name: mangalm_minio
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_dev_2024
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+    networks:
+      - mangalm_network
+    restart: unless-stopped
+
+networks:
+  mangalm_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  minio_data:
+    driver: local

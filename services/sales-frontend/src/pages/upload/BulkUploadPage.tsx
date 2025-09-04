@@ -22,20 +22,6 @@ const BulkUploadPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [localOrders, setLocalOrders] = useState<any[]>([]);
-
-  // Load orders from localStorage on mount
-  useEffect(() => {
-    const storedOrders = localStorage.getItem('localOrders');
-    if (storedOrders) {
-      try {
-        const orders = JSON.parse(storedOrders);
-        setLocalOrders(orders);
-      } catch (e) {
-        console.error('Failed to load orders from localStorage:', e);
-      }
-    }
-  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -127,48 +113,6 @@ const BulkUploadPage: React.FC = () => {
     }
   };
 
-  const loadLocalCSV = async () => {
-    setUploading(true);
-    setError(null);
-    
-    try {
-      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007';
-      
-      // Call the local import endpoint that reads directly from filesystem
-      const response = await fetch(`${apiUrl}/api/orders/import-local`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setLocalOrders(result.orders);
-        // Store in localStorage for persistence
-        localStorage.setItem('localOrders', JSON.stringify(result.orders));
-        localStorage.setItem('lastImportTime', new Date().toISOString());
-        
-        setUploadSuccess(true);
-        setError(null);
-        
-        // Show success message
-        const message = `Successfully loaded ${result.processedCount} orders from local CSV (${result.data.filename})`;
-        console.log(message, result);
-        
-        // Clear success message after 5 seconds
-        setTimeout(() => setUploadSuccess(false), 5000);
-      } else {
-        throw new Error(result.message || 'Failed to load local CSV');
-      }
-    } catch (err) {
-      console.error('Failed to load local CSV:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load local CSV');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const downloadSampleCSV = () => {
     const sampleData = `Invoice ID,Customer Name,Customer ID,Item Name,Quantity,Item Price,Total
@@ -200,9 +144,7 @@ INV-002,Jane Smith,4261931000001048015,Pani Puri,10,12,120`;
 
       {uploadSuccess && (
         <Alert severity="success" sx={{ mb: 3 }}>
-          {localOrders.length > 0 
-            ? `Successfully loaded ${localOrders.length} orders from local CSV!`
-            : 'Files uploaded successfully! The orders are being processed.'}
+          Files uploaded successfully! The orders are being processed.
         </Alert>
       )}
 
@@ -212,35 +154,6 @@ INV-002,Jane Smith,4261931000001048015,Pani Puri,10,12,120`;
         </Alert>
       )}
       
-      {localOrders.length > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Loaded Orders (In Memory)
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {localOrders.length} orders loaded • Last import: {localStorage.getItem('lastImportTime') ? new Date(localStorage.getItem('lastImportTime')!).toLocaleString() : 'N/A'}
-            </Typography>
-            <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
-              {localOrders.slice(0, 5).map((order, index) => (
-                <Box key={order.id} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Typography variant="body2">
-                    <strong>{order.orderNumber}</strong> - {order.customerName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {order.itemCount} items • Total: ${order.totalAmount.toFixed(2)}
-                  </Typography>
-                </Box>
-              ))}
-              {localOrders.length > 5 && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  ... and {localOrders.length - 5} more orders
-                </Typography>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
-      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
@@ -293,19 +206,9 @@ INV-002,Jane Smith,4261931000001048015,Pani Puri,10,12,120`;
                   disabled={!selectedFiles || selectedFiles.length === 0 || uploading}
                   startIcon={<TableChartIcon />}
                   size="large"
+                  fullWidth
                 >
                   {uploading ? 'Uploading...' : 'Upload Orders'}
-                </Button>
-                
-                <Button
-                  variant="outlined"
-                  onClick={loadLocalCSV}
-                  disabled={uploading}
-                  startIcon={<FolderIcon />}
-                  size="large"
-                  color="secondary"
-                >
-                  Load Local CSV
                 </Button>
               </Box>
             </CardContent>

@@ -1,0 +1,172 @@
+# Prometheus Alert Rules for Enterprise Bulk Upload System
+# Critical alerts for 10/10 reliability
+
+groups:
+  - name: bulk_upload_critical
+    interval: 30s
+    rules:
+      # Database alerts
+      - alert: PostgresDown
+        expr: up{service="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_database_numbackends{datname="mangalm_sales"} / pg_settings_max_connections > 0.9
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "PostgreSQL connection pool is >90% utilized"
+
+      - alert: DatabaseSlowQueries
+        expr: rate(pg_stat_statements_mean_exec_time_seconds[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database queries are slow"
+          description: "Average query execution time >1 second for 5 minutes"
+
+      # Redis alerts
+      - alert: RedisDown
+        expr: up{service="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is >90% of max"
+
+      # Queue alerts
+      - alert: QueueBacklogHigh
+        expr: bull_queue_waiting_count{queue="bulk-upload-queue"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "Upload queue backlog is high"
+          description: "More than 1000 jobs waiting in bulk upload queue"
+
+      - alert: QueueProcessingStalled
+        expr: rate(bull_queue_completed_count[5m]) == 0 and bull_queue_active_count > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "Queue processing has stalled"
+          description: "No jobs completed in 5 minutes despite active jobs"
+
+      - alert: HighQueueFailureRate
+        expr: rate(bull_queue_failed_count[5m]) / rate(bull_queue_completed_count[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "High queue failure rate"
+          description: "More than 10% of jobs failing in bulk upload queue"
+
+      # Application alerts
+      - alert: BulkUploadAPIDown
+        expr: up{service="bulk-upload"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Bulk upload API is down"
+          description: "Bulk upload API endpoint has been down for more than 1 minute"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is >5% for 5 minutes"
+
+      - alert: SlowUploads
+        expr: histogram_quantile(0.95, rate(upload_processing_duration_seconds_bucket[5m])) > 60
+        for: 10m
+        labels:
+          severity: warning
+          component: processing
+        annotations:
+          summary: "Uploads are processing slowly"
+          description: "95th percentile upload processing time >60 seconds"
+
+      # Performance alerts
+      - alert: LowThroughput
+        expr: rate(upload_rows_processed_total[5m]) < 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Low upload throughput"
+          description: "Processing less than 1000 rows per second"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / (1024*1024*1024) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Process using more than 2GB memory"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "Process using more than 80% CPU"
+
+      # Data integrity alerts
+      - alert: HighDuplicationRate
+        expr: rate(upload_duplicate_rows_total[5m]) / rate(upload_rows_processed_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: info
+          component: data
+        annotations:
+          summary: "High duplication rate in uploads"
+          description: "More than 20% duplicate rows detected"
+
+      - alert: ValidationFailures
+        expr: rate(upload_validation_failures_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: validation
+        annotations:
+          summary: "High validation failure rate"
+          description: "More than 100 validation failures per second"

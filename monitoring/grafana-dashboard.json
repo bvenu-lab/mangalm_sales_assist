@@ -1,0 +1,198 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Enterprise Bulk Upload System - 10/10 Monitoring",
+    "tags": ["bulk-upload", "enterprise", "performance"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Upload Jobs Overview",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(upload_jobs_created_total[5m]))",
+            "legendFormat": "Jobs Created/sec"
+          },
+          {
+            "expr": "sum(rate(upload_jobs_completed_total[5m]))",
+            "legendFormat": "Jobs Completed/sec"
+          },
+          {
+            "expr": "sum(rate(upload_jobs_failed_total[5m]))",
+            "legendFormat": "Jobs Failed/sec"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Processing Throughput",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(upload_rows_processed_total[5m]))",
+            "legendFormat": "Rows/sec"
+          },
+          {
+            "expr": "sum(rate(upload_bytes_processed_total[5m]))",
+            "legendFormat": "Bytes/sec"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Queue Status",
+        "type": "stat",
+        "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "bull_queue_waiting_count{queue=\"bulk-upload-queue\"}",
+            "legendFormat": "Waiting"
+          },
+          {
+            "expr": "bull_queue_active_count{queue=\"bulk-upload-queue\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "bull_queue_completed_count{queue=\"bulk-upload-queue\"}",
+            "legendFormat": "Completed"
+          },
+          {
+            "expr": "bull_queue_failed_count{queue=\"bulk-upload-queue\"}",
+            "legendFormat": "Failed"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Database Performance",
+        "type": "graph",
+        "gridPos": { "x": 6, "y": 8, "w": 9, "h": 4 },
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{datname=\"mangalm_sales\"}",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "rate(pg_stat_database_xact_commit{datname=\"mangalm_sales\"}[5m])",
+            "legendFormat": "Transactions/sec"
+          },
+          {
+            "expr": "rate(pg_stat_database_tup_inserted{datname=\"mangalm_sales\"}[5m])",
+            "legendFormat": "Inserts/sec"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Redis Performance",
+        "type": "graph",
+        "gridPos": { "x": 15, "y": 8, "w": 9, "h": 4 },
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Connected Clients"
+          },
+          {
+            "expr": "rate(redis_commands_processed_total[5m])",
+            "legendFormat": "Commands/sec"
+          },
+          {
+            "expr": "redis_memory_used_bytes / (1024*1024)",
+            "legendFormat": "Memory (MB)"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Error Rates",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 12, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "rate(upload_validation_failures_total[5m])",
+            "legendFormat": "Validation Errors"
+          },
+          {
+            "expr": "rate(upload_processing_errors_total[5m])",
+            "legendFormat": "Processing Errors"
+          },
+          {
+            "expr": "rate(upload_database_errors_total[5m])",
+            "legendFormat": "Database Errors"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Processing Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": { "x": 8, "y": 12, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(upload_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(upload_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(upload_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "System Resources",
+        "type": "graph",
+        "gridPos": { "x": 16, "y": 12, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / (1024*1024)",
+            "legendFormat": "Memory (MB)"
+          },
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "CPU %"
+          },
+          {
+            "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"} / (1024*1024*1024)",
+            "legendFormat": "Disk Available (GB)"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Data Quality Metrics",
+        "type": "stat",
+        "gridPos": { "x": 0, "y": 18, "w": 24, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(upload_duplicate_rows_total)",
+            "legendFormat": "Total Duplicates"
+          },
+          {
+            "expr": "sum(upload_successful_rows_total)",
+            "legendFormat": "Total Success"
+          },
+          {
+            "expr": "sum(upload_failed_rows_total)",
+            "legendFormat": "Total Failed"
+          },
+          {
+            "expr": "(sum(upload_successful_rows_total) / sum(upload_rows_processed_total)) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ]
+      }
+    ],
+    "version": 1,
+    "uid": "bulk-upload-enterprise",
+    "editable": true,
+    "refresh": "5s"
+  }
+}
