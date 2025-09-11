@@ -109,7 +109,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
-app.use(compression());
+app.use(compression() as any);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -146,7 +146,7 @@ app.get('/health', async (req: Request, res: Response) => {
   } catch (error) {
     res.status(503).json({
       status: 'unhealthy',
-      error: error.message
+      error: (error as Error).message
     });
   }
 });
@@ -154,7 +154,7 @@ app.get('/health', async (req: Request, res: Response) => {
 /**
  * Main bulk upload endpoint - THIS IS WHERE THE MAGIC HAPPENS
  */
-app.post('/api/bulk-upload', upload.single('file'), async (req: Request, res: Response) => {
+app.post('/api/bulk-upload', upload.single('file') as any, async (req: Request, res: Response) => {
   let uploadId: string | null = null;
   
   try {
@@ -295,7 +295,7 @@ app.post('/api/bulk-upload', upload.single('file'), async (req: Request, res: Re
     
     res.status(500).json({
       error: 'Upload failed',
-      message: error.message,
+      message: (error as Error).message,
       uploadId
     });
   }

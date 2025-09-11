@@ -47,10 +47,10 @@ export interface DatabaseConfig {
 const configs: Record<string, DatabaseConfig> = {
   development: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+    port: parseInt(process.env.DB_PORT || '3432', 10),
     database: process.env.DB_NAME || 'mangalm_sales',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres_dev_2024',
+    user: process.env.DB_USER || 'mangalm',
+    password: process.env.DB_PASSWORD || 'mangalm_secure_password',
     
     // Development pool settings
     max: 20,
@@ -167,22 +167,8 @@ export class DatabasePoolManager extends EventEmitter {
     const poolConfig: PoolConfig = {
       ...this.config,
       
-      // Connection lifecycle callbacks
-      connect: (client: any) => {
-        client.query('SET search_path TO bulk_upload, public');
-        this.metrics.totalConnections++;
-        this.emit('connection:created');
-      },
-      
-      remove: (client: any) => {
-        this.metrics.totalConnections--;
-        this.emit('connection:removed');
-      },
-      
-      error: (err: Error, client: any) => {
-        this.metrics.errors++;
-        this.handlePoolError(err);
-      }
+      // Connection lifecycle callbacks - handled separately 
+      // Pool callbacks not supported in modern pg PoolConfig
     };
 
     this.pool = new Pool(poolConfig);
@@ -364,7 +350,7 @@ export class DatabasePoolManager extends EventEmitter {
     console.info('[DatabasePool] Shutting down...');
     
     if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
+      clearInterval(this.healthCheckInterval as any);
     }
     
     if (this.pool) {

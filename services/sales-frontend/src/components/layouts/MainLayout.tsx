@@ -155,7 +155,7 @@ const MainLayout: React.FC = () => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/orders/history')}>
+          <ListItemButton onClick={() => handleNavigation('/orders')}>
             <ListItemIcon>
               <ShoppingCartIcon />
             </ListItemIcon>

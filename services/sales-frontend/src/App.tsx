@@ -4,13 +4,13 @@ import { Box, CircularProgress } from '@mui/material';
 
 import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layouts/MainLayout';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import SimpleProtectedRoute from './components/common/SimpleProtectedRoute';
 import ErrorBoundary from './components/errors/ErrorBoundary';
 import NotificationProvider from './components/notifications/NotificationSystem';
 import { SkeletonDashboard } from './components/loading/LoadingSkeleton';
 
 // Lazy load pages for better performance
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const LoginPage = lazy(() => import('./pages/auth/FormLoginPage'));
 const ClearAuthPage = lazy(() => import('./pages/auth/ClearAuthPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/EnhancedDashboard'));
 const StoreListPage = lazy(() => import('./pages/stores/StoreListPage'));
@@ -24,6 +24,7 @@ const PerformancePage = lazy(() => import('./pages/performance/PerformancePage')
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 const BulkUploadPage = lazy(() => import('./pages/upload/BulkUploadPage'));
+const EnterpriseBulkUploadPage = lazy(() => import('./pages/upload/EnterpriseBulkUploadPage'));
 const NotFoundPage = lazy(() => import('./pages/errors/NotFoundPage'));
 const DocumentProcessingPage = lazy(() => import('./pages/documents/DocumentProcessingPage'));
 
@@ -50,7 +51,7 @@ const App: React.FC = () => {
         <Route path="/clear-auth" element={<ClearAuthPage />} />
 
         {/* Protected routes */}
-        <Route element={<ProtectedRoute />}>
+        <Route element={<SimpleProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -66,8 +67,9 @@ const App: React.FC = () => {
             <Route path="/performance" element={<PerformancePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/bulk-upload" element={<BulkUploadPage />} />
-            <Route path="/upload" element={<BulkUploadPage />} />
+            <Route path="/bulk-upload" element={<EnterpriseBulkUploadPage />} />
+            <Route path="/upload" element={<EnterpriseBulkUploadPage />} />
+            <Route path="/legacy-upload" element={<BulkUploadPage />} />
           </Route>
         </Route>
 

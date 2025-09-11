@@ -18,10 +18,10 @@ class DatabaseConnection {
 
     this.pool = new Pool({
       host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
+      port: parseInt(process.env.DB_PORT || '3432'),
       database: process.env.DB_NAME || 'mangalm_sales',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
+      user: process.env.DB_USER || 'mangalm',
+      password: process.env.DB_PASSWORD || 'mangalm_secure_password',
       max: 20, // Maximum number of clients in the pool
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,

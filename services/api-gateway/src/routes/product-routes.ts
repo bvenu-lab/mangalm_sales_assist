@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { productRepository } from '../database/product-repository';
 import { logger } from '../utils/logger';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
 /**
  * Get all products with filtering and pagination
  */
-router.get('/products', async (req: Request, res: Response) => {
+router.get('/products', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const params = {
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
@@ -41,7 +42,7 @@ router.get('/products', async (req: Request, res: Response) => {
 /**
  * Get product categories
  */
-router.get('/products/categories', async (req: Request, res: Response) => {
+router.get('/products/categories', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const categories = await productRepository.getCategories();
     
@@ -62,7 +63,7 @@ router.get('/products/categories', async (req: Request, res: Response) => {
 /**
  * Get product brands
  */
-router.get('/products/brands', async (req: Request, res: Response) => {
+router.get('/products/brands', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const brands = await productRepository.getBrands();
     
@@ -83,7 +84,7 @@ router.get('/products/brands', async (req: Request, res: Response) => {
 /**
  * Get products by category
  */
-router.get('/products/category/:category', async (req: Request, res: Response) => {
+router.get('/products/category/:category', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
     const products = await productRepository.getByCategory(req.params.category, limit);
@@ -105,7 +106,7 @@ router.get('/products/category/:category', async (req: Request, res: Response) =
 /**
  * Get product by ID
  */
-router.get('/products/:id', async (req: Request, res: Response) => {
+router.get('/products/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const product = await productRepository.getById(req.params.id);
     
@@ -132,7 +133,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
 /**
  * Create a new product
  */
-router.post('/products', async (req: Request, res: Response) => {
+router.post('/products', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const product = await productRepository.create(req.body);
     
@@ -153,7 +154,7 @@ router.post('/products', async (req: Request, res: Response) => {
 /**
  * Update a product
  */
-router.put('/products/:id', async (req: Request, res: Response) => {
+router.put('/products/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const product = await productRepository.update(req.params.id, req.body);
     
@@ -182,7 +183,7 @@ router.put('/products/:id', async (req: Request, res: Response) => {
 /**
  * Delete a product
  */
-router.delete('/products/:id', async (req: Request, res: Response) => {
+router.delete('/products/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const deleted = await productRepository.delete(req.params.id);
     

@@ -10,10 +10,10 @@ services:
       POSTGRES_USER: mangalm
       POSTGRES_PASSWORD: mangalm_secure_password
     ports:
-      - "5432:5432"
+      - "3432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d
+      # - ./database/migrations:/docker-entrypoint-initdb.d  # Disabled due to missing dependencies
     networks:
       - mangalm-network
 
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: mangalm-redis
     ports:
-      - "6379:6379"
+      - "3379:6379"
     networks:
       - mangalm-network
 
@@ -48,30 +48,30 @@ services:
       - ./services/ai-prediction-service:/app
       - /app/node_modules
 
-  # Zoho Integration Service
-  zoho-integration:
-    build:
-      context: ./services/zoho-integration
-      dockerfile: Dockerfile
-    container_name: mangalm-zoho-integration
-    environment:
-      NODE_ENV: production
-      PORT: 3002
-      DATABASE_URL: postgresql://mangalm:mangalm_secure_password@postgres:5432/mangalm_sales
-      REDIS_URL: redis://redis:6379
-      ZOHO_CLIENT_ID: ${ZOHO_CLIENT_ID}
-      ZOHO_CLIENT_SECRET: ${ZOHO_CLIENT_SECRET}
-      ZOHO_REFRESH_TOKEN: ${ZOHO_REFRESH_TOKEN}
-    ports:
-      - "3002:3002"
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - mangalm-network
-    volumes:
-      - ./services/zoho-integration:/app
-      - /app/node_modules
+  # Zoho Integration Service (DISABLED)
+  # zoho-integration:
+  #   build:
+  #     context: ./services/zoho-integration
+  #     dockerfile: Dockerfile
+  #   container_name: mangalm-zoho-integration
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3002
+  #     DATABASE_URL: postgresql://mangalm:mangalm_secure_password@postgres:5432/mangalm_sales
+  #     REDIS_URL: redis://redis:6379
+  #     ZOHO_CLIENT_ID: ${ZOHO_CLIENT_ID}
+  #     ZOHO_CLIENT_SECRET: ${ZOHO_CLIENT_SECRET}
+  #     ZOHO_REFRESH_TOKEN: ${ZOHO_REFRESH_TOKEN}
+  #   ports:
+  #     - "3002:3002"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   networks:
+  #     - mangalm-network
+  #   volumes:
+  #     - ./services/zoho-integration:/app
+  #     - /app/node_modules
 
   # Sales Frontend (React App)
   sales-frontend:
@@ -87,29 +87,29 @@ services:
       - "3000:3000"
     depends_on:
       - ai-prediction
-      - zoho-integration
+      # - zoho-integration
     networks:
       - mangalm-network
     volumes:
       - ./services/sales-frontend:/app
       - /app/node_modules
 
-  # Nginx Reverse Proxy (optional, for production)
-  nginx:
-    image: nginx:alpine
-    container_name: mangalm-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./services/sales-frontend/build:/usr/share/nginx/html:ro
-    depends_on:
-      - ai-prediction
-      - zoho-integration
-      - sales-frontend
-    networks:
-      - mangalm-network
+  # Nginx Reverse Proxy (DISABLED - nginx.conf missing)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: mangalm-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./services/sales-frontend/build:/usr/share/nginx/html:ro
+  #   depends_on:
+  #     - ai-prediction
+  #     # - zoho-integration
+  #     - sales-frontend
+  #   networks:
+  #     - mangalm-network
 
 networks:
   mangalm-network:

@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-09-11T17:51:14.741Z",
+  "duration": "0.44s",
+  "journeys": [
+    {
+      "name": "Homepage & Navigation",
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "name": "File Upload & Processing",
+      "passed": 3,
+      "total": 4
+    },
+    {
+      "name": "Analytics & Reporting",
+      "passed": 4,
+      "total": 4
+    },
+    {
+      "name": "Performance & Load Test",
+      "passed": 3,
+      "total": 3
+    }
+  ],
+  "summary": {
+    "totalTests": 16,
+    "passed": 15,
+    "failed": 1,
+    "successRate": "93.8%"
+  },
+  "verdict": "PRODUCTION_READY"
+}

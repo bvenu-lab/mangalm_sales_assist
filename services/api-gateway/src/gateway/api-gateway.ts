@@ -16,6 +16,7 @@ import { orderRoutes, importLocalHandler } from '../routes/order-routes';
 import { documentRoutes } from '../routes/document-routes';
 import { testUploadRoutes } from '../routes/test-upload-routes';
 import { productAlertsRoutes } from '../routes/product-alerts-routes';
+import { createCompleteCRUDRoutes } from '../routes/complete-crud-routes';
 import { logger } from '../utils/logger';
 import { PortManager } from '../utils/port-manager';
 
@@ -76,9 +77,9 @@ export class APIGateway {
     });
     
     // TEMPORARILY DISABLE AUTHENTICATION FOR TESTING
-    // Setup dashboard routes
+    // Setup dashboard routes with real database connection
     const dashboardRouter = createDashboardRoutes();
-    this.app.use('/api', dashboardRouter);
+    this.app.use('/api/dashboard', dashboardRouter);
     
     // Setup performance routes  
     const performanceRouter = createPerformanceRoutes();
@@ -91,13 +92,26 @@ export class APIGateway {
     // Setup analytics routes
     const analyticsRouter = createAnalyticsRoutes();
     this.app.use('/api/analytics', analyticsRouter);
-    
-    // Setup dashboard routes with real database connection
-    const dashboardRoutes = createDashboardRoutes();
-    this.app.use('/api', dashboardRoutes);
+    logger.info('Analytics routes initialized', {
+      endpoints: ['/api/analytics/trends', '/api/analytics/product-distribution', '/api/analytics/performance-metrics', '/api/analytics/insights']
+    });
     
     // Setup store routes with real database connection
     this.app.use('/api', storeRoutes);
+    
+    // Setup complete CRUD routes for all entities with persistence
+    const completeCRUDRouter = createCompleteCRUDRoutes();
+    this.app.use('/api', completeCRUDRouter);
+    logger.info('Complete CRUD routes initialized', {
+      endpoints: [
+        '/api/predicted-orders', 
+        '/api/stores/:id/preferences',
+        '/api/dashboard-settings/:userId',
+        '/api/orders/:id',
+        '/api/user-actions',
+        '/api/dashboard/summary'
+      ]
+    });
     
     // Setup product routes with real database connection
     this.app.use('/api', productRoutes);

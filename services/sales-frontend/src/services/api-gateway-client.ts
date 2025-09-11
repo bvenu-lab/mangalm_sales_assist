@@ -137,7 +137,7 @@ export class ApiGatewayClient {
   public async login(username: string, password: string): Promise<any> {
     console.log('[Auth] Attempting login for user:', username);
     try {
-      const response = await this.client.post('/auth/login', { username, password });
+      const response = await this.client.post('/api/auth/login', { username, password });
       if (response.data.token) {
         console.log('[Auth] Login successful, token received');
         this.setAuthToken(response.data.token);
@@ -155,7 +155,7 @@ export class ApiGatewayClient {
   public async logout(): Promise<void> {
     console.log('[Auth] Attempting logout');
     try {
-      await this.client.post('/auth/logout');
+      await this.client.post('/api/auth/logout');
       console.log('[Auth] Logout successful');
       this.clearAuthToken();
     } catch (error) {
@@ -619,7 +619,7 @@ export class ApiGatewayClient {
 
 // Create singleton instance
 const apiGatewayClient = new ApiGatewayClient({
-  baseURL: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3001',
+  baseURL: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007',
   timeout: 30000
 });
 

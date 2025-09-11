@@ -163,6 +163,7 @@ export interface ProcessingError {
 export enum ErrorType {
   VALIDATION = 'validation',
   PARSING = 'parsing',
+  PROCESSING = 'processing',
   BUSINESS_LOGIC = 'business_logic',
   DATABASE = 'database',
   DUPLICATE = 'duplicate',

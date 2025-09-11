@@ -212,9 +212,9 @@ router.post('/', upload.single('file'), async (req, res) => {
       
       await client.query('COMMIT');
       
-      // Add to processing queue
+      // Add to processing queue (no specific job name - let processor handle all)
       const uploadQueue = redisManager.getQueue('bulk-upload-queue');
-      const job = await uploadQueue.add(`upload-${uploadId}`, {
+      const job = await uploadQueue.add({
         uploadId,
         filePath: req.file.path,
         fileName: req.file.originalname,

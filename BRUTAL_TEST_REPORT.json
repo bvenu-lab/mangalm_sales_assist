@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-09-11T18:13:23.632Z",
+  "duration": "1.23s",
+  "summary": {
+    "passed": 28,
+    "failed": 2,
+    "critical": 0,
+    "warnings": 1
+  },
+  "details": {
+    "passed": [
+      "Node.js processes running",
+      "Port 3000 listening (Frontend)",
+      "Port 3007 listening (API Gateway)",
+      "Port 3009 listening (Bulk Upload API)",
+      "Port 3432 listening (PostgreSQL)",
+      "Port 3379 listening (Redis)",
+      "Frontend HTTP response",
+      "API Gateway HTTP response",
+      "Bulk Upload API HTTP response",
+      "PostgreSQL connection",
+      "Table 'stores' exists",
+      "Table 'products' exists",
+      "Table 'mangalam_invoices' exists",
+      "Table 'invoice_items' exists",
+      "Table 'orders' exists",
+      "Table 'dashboard_summary' exists",
+      "API: Get Stores",
+      "API: Get Products",
+      "API: Dashboard Summary",
+      "Homepage HTTP response",
+      "Upload Page HTTP response",
+      "API Health HTTP response",
+      "Critical file: package.json",
+      "Critical file: docker-compose.yml",
+      "Critical file: config/database.config.js",
+      "Critical file: services/api-gateway/package.json",
+      "Critical file: services/bulk-upload-api/package.json",
+      "Critical file: services/sales-frontend/package.json"
+    ],
+    "failed": [
+      "API: Upload Validation",
+      "API: Upload Validation"
+    ],
+    "critical": [],
+    "warnings": [
+      "User journey failed at: Validate upload endpoint"
+    ]
+  },
+  "verdict": "FAIL"
+}

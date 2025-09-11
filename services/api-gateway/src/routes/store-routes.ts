@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { storeRepository } from '../database/store-repository';
 import { logger } from '../utils/logger';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
 /**
  * Get all stores with filtering and pagination
  */
-router.get('/stores', async (req: Request, res: Response) => {
+router.get('/stores', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const params = {
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
@@ -39,7 +40,7 @@ router.get('/stores', async (req: Request, res: Response) => {
 /**
  * Get recent stores
  */
-router.get('/stores/recent', async (req: Request, res: Response) => {
+router.get('/stores/recent', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
     const stores = await storeRepository.getRecent(limit);
@@ -61,7 +62,7 @@ router.get('/stores/recent', async (req: Request, res: Response) => {
 /**
  * Get unique regions
  */
-router.get('/stores/regions', async (req: Request, res: Response) => {
+router.get('/stores/regions', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const regions = await storeRepository.getRegions();
     
@@ -82,7 +83,7 @@ router.get('/stores/regions', async (req: Request, res: Response) => {
 /**
  * Get store by ID
  */
-router.get('/stores/:id', async (req: Request, res: Response) => {
+router.get('/stores/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const store = await storeRepository.getById(req.params.id);
     
@@ -109,7 +110,7 @@ router.get('/stores/:id', async (req: Request, res: Response) => {
 /**
  * Create a new store
  */
-router.post('/stores', async (req: Request, res: Response) => {
+router.post('/stores', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const store = await storeRepository.create(req.body);
     
@@ -130,7 +131,7 @@ router.post('/stores', async (req: Request, res: Response) => {
 /**
  * Update a store
  */
-router.put('/stores/:id', async (req: Request, res: Response) => {
+router.put('/stores/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const store = await storeRepository.update(req.params.id, req.body);
     
@@ -159,7 +160,7 @@ router.put('/stores/:id', async (req: Request, res: Response) => {
 /**
  * Delete a store
  */
-router.delete('/stores/:id', async (req: Request, res: Response) => {
+router.delete('/stores/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const deleted = await storeRepository.delete(req.params.id);
     

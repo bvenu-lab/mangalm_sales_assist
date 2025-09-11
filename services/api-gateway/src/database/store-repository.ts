@@ -39,9 +39,9 @@ export class StoreRepository {
           s.*,
           COUNT(hi.id) as order_count,
           MAX(hi.invoice_date) as last_order_date,
-          SUM(hi.total_amount) as total_revenue
+          SUM(hi.total) as total_revenue
         FROM stores s
-        LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+        LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
         WHERE 1=1
       `;
       let countQuery = 'SELECT COUNT(DISTINCT s.id) FROM stores s WHERE 1=1';
@@ -53,8 +53,7 @@ export class StoreRepository {
       if (params?.search) {
         const searchCondition = ` AND (
           LOWER(s.name) LIKE $${paramIndex} OR 
-          LOWER(COALESCE(s.city, '')) LIKE $${paramIndex} OR 
-          LOWER(COALESCE(s.state, '')) LIKE $${paramIndex}
+          LOWER(COALESCE(s.address, '')) LIKE $${paramIndex}
         )`;
         query += searchCondition;
         countQuery += searchCondition;
@@ -66,8 +65,8 @@ export class StoreRepository {
 
       // Add region filter (using state column)
       if (params?.region && params.region !== 'all') {
-        query += ` AND s.state = $${paramIndex}`;
-        countQuery += ` AND s.state = $${paramIndex}`;
+        query += ` AND COALESCE(s.address, '') = $${paramIndex}`;
+        countQuery += ` AND COALESCE(s.address, '') = $${paramIndex}`;
         queryParams.push(params.region);
         countParams.push(params.region);
         paramIndex++;

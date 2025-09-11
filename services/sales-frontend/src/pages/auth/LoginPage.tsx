@@ -37,6 +37,14 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
+  console.log('[LoginPage] Component rendered', {
+    isAuthenticated,
+    isSubmitting,
+    hasError: !!error,
+    username: username ? 'set' : 'empty',
+    password: password ? 'set' : 'empty'
+  });
+  
   // Get the redirect path from location state or default to dashboard
   const locationState = location.state as LocationState;
   const from = locationState?.from?.pathname || '/dashboard';
@@ -61,19 +69,27 @@ const LoginPage: React.FC = () => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LoginPage] Form submitted!');
+    console.log('[LoginPage] Username:', username);
+    console.log('[LoginPage] Password:', password ? '***' : '(empty)');
     
     if (!username || !password) {
+      console.log('[LoginPage] Validation failed - missing credentials');
       setLoginError('Username and password are required');
       return;
     }
     
     try {
+      console.log('[LoginPage] Starting login process...');
       setIsSubmitting(true);
       setLoginError(null);
       
+      console.log('[LoginPage] Calling login function from AuthContext...');
       await login(username, password);
+      console.log('[LoginPage] Login function completed');
       // Navigation will happen in the useEffect when isAuthenticated changes
     } catch (err) {
+      console.error('[LoginPage] Login error:', err);
       // Error is already set in the auth context
       setIsSubmitting(false);
     }
@@ -140,17 +156,26 @@ const LoginPage: React.FC = () => {
           </Alert>
         )}
         
-        <form onSubmit={handleSubmit}>
+        <Box component="div">
           <TextField
             label="Username"
             variant="outlined"
             fullWidth
             margin="normal"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => {
+              console.log('[LoginPage] Username changed:', e.target.value);
+              setUsername(e.target.value);
+            }}
             disabled={isSubmitting}
             autoFocus
             required
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                console.log('[LoginPage] Enter pressed in username field');
+                e.preventDefault();
+              }
+            }}
           />
           
           <TextField
@@ -160,9 +185,19 @@ const LoginPage: React.FC = () => {
             margin="normal"
             type={showPassword ? 'text' : 'password'}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              console.log('[LoginPage] Password changed');
+              setPassword(e.target.value);
+            }}
             disabled={isSubmitting}
             required
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                console.log('[LoginPage] Enter pressed in password field');
+                e.preventDefault();
+                handleSubmit(e as any);
+              }
+            }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -179,17 +214,32 @@ const LoginPage: React.FC = () => {
           />
           
           <Box sx={{ mt: 1, mb: 3, textAlign: 'right' }}>
-            <Link href="#" variant="body2" underline="hover">
+            <Link 
+              component="button"
+              variant="body2" 
+              underline="hover"
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('[LoginPage] Forgot password clicked');
+              }}
+            >
               Forgot password?
             </Link>
           </Box>
           
           <Button
-            type="submit"
             fullWidth
             variant="contained"
             size="large"
             disabled={isSubmitting}
+            onClick={(e) => {
+              console.log('[LoginPage] === BUTTON CLICKED ===');
+              console.log('[LoginPage] Current username:', username);
+              console.log('[LoginPage] Current password:', password ? '***' : '(empty)');
+              e.preventDefault();
+              e.stopPropagation();
+              handleSubmit(e as any);
+            }}
             sx={{ py: 1.5 }}
           >
             {isSubmitting ? (
@@ -198,7 +248,7 @@ const LoginPage: React.FC = () => {
               'Sign In'
             )}
           </Button>
-        </form>
+        </Box>
         
         <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Divider sx={{ mb: 2 }}>

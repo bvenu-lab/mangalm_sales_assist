@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Dashboard Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .success { background: #4CAF50; color: white; }
+        .primary { background: #2196F3; color: white; }
+        .warning { background: #ff9800; color: white; }
+        .info { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        pre { background: #333; color: #0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Direct Dashboard Access Test</h1>
+        
+        <div class="info">
+            <h3>Current Status:</h3>
+            <p id="status">Checking authentication...</p>
+            <p>Token: <span id="token-status">Checking...</span></p>
+            <p>User: <span id="user-status">Checking...</span></p>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button class="success" onclick="doQuickLogin()">Quick Login</button>
+            <button class="primary" onclick="checkAuth()">Check Auth</button>
+            <button class="primary" onclick="goToDashboard()">Go to Dashboard</button>
+            <button class="warning" onclick="clearAuth()">Clear Auth</button>
+        </div>
+
+        <h3>Console Output:</h3>
+        <pre id="console"></pre>
+    </div>
+
+    <script>
+        const log = (msg) => {
+            console.log(msg);
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent += msg + '\n';
+        };
+
+        function checkAuth() {
+            log('=== Checking Authentication ===');
+            
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user');
+            
+            document.getElementById('token-status').textContent = token ? token.substring(0, 50) + '...' : 'No token';
+            document.getElementById('user-status').textContent = user ? user : 'No user';
+            
+            if (token) {
+                log('Token found: ' + token.substring(0, 50) + '...');
+                
+                // Test token validity
+                fetch('http://localhost:3007/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    log('Token validation response: ' + JSON.stringify(data));
+                    if (data.success) {
+                        document.getElementById('status').textContent = '✅ Authenticated as ' + data.user.username;
+                    } else {
+                        document.getElementById('status').textContent = '❌ Token invalid';
+                    }
+                })
+                .catch(err => {
+                    log('Token validation error: ' + err.message);
+                    document.getElementById('status').textContent = '❌ Error checking token';
+                });
+            } else {
+                log('No token found in localStorage');
+                document.getElementById('status').textContent = '❌ Not authenticated';
+            }
+        }
+
+        async function doQuickLogin() {
+            log('=== Quick Login ===');
+            
+            try {
+                const response = await fetch('http://localhost:3007/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'demo', password: 'demo2025' })
+                });
+                
+                const data = await response.json();
+                log('Login response: ' + JSON.stringify(data));
+                
+                if (data.success && data.token) {
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    log('✅ Login successful! Token stored.');
+                    checkAuth();
+                } else {
+                    log('❌ Login failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                log('❌ Login error: ' + err.message);
+            }
+        }
+
+        function goToDashboard() {
+            log('Navigating to /dashboard...');
+            window.location.href = '/dashboard';
+        }
+
+        function clearAuth() {
+            log('Clearing authentication...');
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            checkAuth();
+        }
+
+        // Check on load
+        window.onload = () => {
+            log('Page loaded at ' + new Date().toLocaleTimeString());
+            checkAuth();
+        };
+    </script>
+</body>
+</html>
