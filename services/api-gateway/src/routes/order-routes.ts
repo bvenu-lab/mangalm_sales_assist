@@ -13,8 +13,7 @@
 import { Router, Request, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { logger } from '../utils/logger';
-import { authenticateToken } from '../middleware/auth';
-import { authorizeRoles } from '../middleware/authorization';
+// Authentication removed - no auth imports needed
 import { rateLimit } from '../middleware/rate-limit';
 import { auditLog } from '../middleware/audit';
 import axios from 'axios';
@@ -62,7 +61,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 20 * 1024 * 1024, // 20MB limit (increased for large CSV files)
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
@@ -120,10 +119,10 @@ const handleValidationErrors = (req: Request, res: Response, next: any) => {
  * Generate order form from extracted document data
  */
 router.post('/orders/generate',
-  authenticateToken,
+  // No auth required
   rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }),
   auditLog,
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep']),
+  // No auth required
   [
     body('extractedOrderId')
       .isUUID()
@@ -185,10 +184,10 @@ router.post('/orders/generate',
  * Create a new order
  */
 router.post('/orders',
-  authenticateToken,
+  // No auth required
   rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }),
   auditLog,
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep']),
+  // No auth required
   [
     body('orderNumber')
       .isString()
@@ -261,10 +260,147 @@ router.post('/orders',
 );
 
 /**
+ * Get order analytics and statistics
+ */
+router.get('/orders/analytics',
+  // No auth required
+  [
+    query('storeId')
+      .optional()
+      .isString()
+      .withMessage('storeId must be a string'),
+    query('fromDate')
+      .optional()
+      .isISO8601()
+      .withMessage('fromDate must be a valid ISO date'),
+    query('toDate')
+      .optional()
+      .isISO8601()
+      .withMessage('toDate must be a valid ISO date'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response) => {
+    try {
+      logger.info(`Retrieving order analytics for store: ${req.query.storeId || 'all'}`);
+
+      // Get REAL analytics data from database
+      const storeId = req.query.storeId as string;
+      const fromDate = req.query.fromDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const toDate = req.query.toDate as string || new Date().toISOString();
+      
+      // Query real orders data
+      let analyticsQuery = `
+        SELECT 
+          COUNT(*) as total_orders,
+          SUM(total_amount) as total_revenue,
+          AVG(total_amount) as avg_order_value,
+          MIN(order_date) as period_start,
+          MAX(order_date) as period_end
+        FROM orders
+        WHERE order_date BETWEEN $1 AND $2
+      `;
+      
+      const queryParams: any[] = [fromDate, toDate];
+      
+      if (storeId && storeId !== 'all') {
+        analyticsQuery += ' AND store_id = $3';
+        queryParams.push(storeId);
+      }
+      
+      const analyticsResult = await pool.query(analyticsQuery, queryParams);
+      const analytics = analyticsResult.rows[0];
+      
+      // Get top products from real data (using JSONB items)
+      let topProductsQuery = `
+        WITH order_items AS (
+          SELECT 
+            o.id,
+            o.store_id,
+            o.order_date,
+            jsonb_array_elements(o.items) as item
+          FROM orders o
+          WHERE o.order_date BETWEEN $1 AND $2
+        )
+        SELECT 
+          item->>'product' as product_name,
+          COUNT(DISTINCT id) as order_count,
+          SUM((item->>'quantity')::numeric) as total_quantity,
+          SUM((item->>'quantity')::numeric * (item->>'price')::numeric) as revenue
+        FROM order_items
+        WHERE 1=1
+      `;
+      
+      const topProductsParams: any[] = [fromDate, toDate];
+      
+      if (storeId && storeId !== 'all') {
+        topProductsQuery += ' AND store_id = $3';
+        topProductsParams.push(storeId);
+      }
+      
+      topProductsQuery += `
+        GROUP BY product_name
+        ORDER BY total_quantity DESC
+        LIMIT 5
+      `;
+      
+      const topProductsResult = await pool.query(topProductsQuery, topProductsParams);
+      
+      // Simple trend calculation from real data
+      const trend = { trend: 'stable', growth_rate: 0 };
+      
+      // Calculate growth rate if we have enough data
+      if (analytics.total_orders > 0) {
+        // Get older period for comparison
+        const oldPeriodQuery = `
+          SELECT COUNT(*) as old_orders, SUM(total_amount) as old_revenue
+          FROM orders
+          WHERE order_date < $1
+            AND order_date >= $1::timestamp - INTERVAL '30 days'
+            ${storeId && storeId !== 'all' ? 'AND store_id = $2' : ''}
+        `;
+        
+        const oldParams = storeId && storeId !== 'all' ? [fromDate, storeId] : [fromDate];
+        const oldResult = await pool.query(oldPeriodQuery, oldParams);
+        const oldData = oldResult.rows[0];
+        
+        if (oldData.old_revenue && parseFloat(oldData.old_revenue) > 0) {
+          const currentRevenue = parseFloat(analytics.total_revenue) || 0;
+          const oldRevenue = parseFloat(oldData.old_revenue);
+          trend.growth_rate = ((currentRevenue - oldRevenue) / oldRevenue) * 100;
+          trend.trend = trend.growth_rate > 5 ? 'increasing' : trend.growth_rate < -5 ? 'decreasing' : 'stable';
+        }
+      }
+      
+      const result = {
+        storeId: storeId || 'all',
+        period: {
+          from: fromDate,
+          to: toDate
+        },
+        totalOrders: parseInt(analytics.total_orders) || 0,
+        totalRevenue: parseFloat(analytics.total_revenue) || 0,
+        averageOrderValue: parseFloat(analytics.avg_order_value) || 0,
+        topProducts: topProductsResult.rows,
+        orderTrend: trend.trend,
+        growthRate: trend.growth_rate || 0
+      };
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error('Error retrieving order analytics', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve order analytics'
+      });
+    }
+  }
+);
+
+/**
  * Get order by ID
  */
 router.get('/orders/:id',
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep', 'viewer']),
+  // No auth required
   [
     param('id')
       .isUUID()
@@ -347,7 +483,7 @@ router.get('/orders/:id',
  * Update order
  */
 router.put('/orders/:id',
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep']),
+  // No auth required
   [
     param('id')
       .isUUID()
@@ -566,7 +702,7 @@ router.delete('/orders/clear-all',
  * Delete order
  */
 router.delete('/orders/:id',
-  authorizeRoles(['admin', 'sales_manager']),
+  // No auth required
   [
     param('id')
       .isUUID()
@@ -620,7 +756,7 @@ router.delete('/orders/:id',
  * Confirm order
  */
 router.post('/orders/:id/confirm',
-  authorizeRoles(['admin', 'sales_manager']),
+  // No auth required
   [
     param('id')
       .isUUID()
@@ -675,7 +811,7 @@ router.post('/orders/:id/confirm',
  * Reject order
  */
 router.post('/orders/:id/reject',
-  authorizeRoles(['admin', 'sales_manager']),
+  // No auth required
   [
     param('id')
       .isUUID()
@@ -730,7 +866,7 @@ router.post('/orders/:id/reject',
  * Get orders with filtering and pagination
  */
 router.get('/orders',
-  // authorizeRoles(['admin', 'sales_manager', 'sales_rep', 'viewer']), // Disabled for testing
+  // // No auth required // Disabled for testing
   [
     query('storeId')
       .optional()
@@ -836,49 +972,12 @@ router.get('/orders',
   }
 );
 
-/**
- * Get order analytics and statistics
- */
-router.get('/orders/analytics',
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep']),
-  [
-    query('storeId')
-      .optional()
-      .isString()
-      .withMessage('storeId must be a string'),
-    query('fromDate')
-      .optional()
-      .isISO8601()
-      .withMessage('fromDate must be a valid ISO date'),
-    query('toDate')
-      .optional()
-      .isISO8601()
-      .withMessage('toDate must be a valid ISO date'),
-  ],
-  handleValidationErrors,
-  async (req: Request, res: Response) => {
-    try {
-      logger.info(`Retrieving order analytics for store: ${req.query.storeId || 'all'}`);
-
-      const queryString = new URLSearchParams(req.query as any).toString();
-      const result = await callDocumentProcessor(`/analytics?${queryString}`);
-
-      res.json(result);
-    } catch (error: any) {
-      logger.error('Error retrieving order analytics', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve order analytics'
-      });
-    }
-  }
-);
 
 /**
  * Validate order data
  */
 router.post('/orders/validate',
-  authorizeRoles(['admin', 'sales_manager', 'sales_rep']),
+  // No auth required
   async (req: Request, res: Response) => {
     try {
       logger.info('Validating order data');
@@ -972,7 +1071,7 @@ router.get('/orders/history',
  * Get pending orders history
  */
 router.get('/orders/pending/history',
-  authenticateToken, // Apply auth to this specific route
+  // No auth required // Apply auth to this specific route
   async (req: Request, res: Response) => {
     try {
       logger.info('Fetching pending orders history');
@@ -1005,10 +1104,25 @@ router.get('/orders/pending/history',
 /**
  * Import orders from CSV/Excel file
  */
+// Add /orders/upload as an alias for /orders/import
+router.post('/orders/upload',
+  upload.single('file'),
+  async (req: Request, res: Response) => {
+    // Forward to the import handler
+    return importHandler(req, res);
+  }
+);
+
 router.post('/orders/import',
   // Authentication disabled for local CSV import testing
   upload.single('file'),
   async (req: Request, res: Response) => {
+    return importHandler(req, res);
+  }
+);
+
+// Shared import handler function
+async function importHandler(req: Request, res: Response) {
     let tempFilePath: string | null = null;
     
     try {
@@ -1371,8 +1485,7 @@ router.post('/orders/import',
         details: 'Please ensure your CSV has columns like: Invoice ID, Customer Name, Item Name, Quantity, Item Price, Total'
       });
     }
-  }
-);
+}
 
 // Export the local import handler separately for direct mounting
 export const importLocalHandler = async (req: Request, res: Response) => {

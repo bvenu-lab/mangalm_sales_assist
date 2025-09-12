@@ -178,7 +178,7 @@ export function createUpsellingRoutes(): Router {
             COUNT(DISTINCT hi.id) as order_count,
             MAX(hi.invoice_date) as last_ordered
           FROM historical_invoices hi
-          JOIN invoice_items ii ON hi.id = ii.invoice_id
+          JOIN invoice_items ii ON hi.invoice_number = ii.invoice_id
           WHERE hi.store_id = $1::text
           GROUP BY ii.product_id
         ),
@@ -193,7 +193,7 @@ export function createUpsellingRoutes(): Router {
               ELSE 'stable'
             END as trend
           FROM historical_invoices hi
-          JOIN invoice_items ii ON hi.id = ii.invoice_id
+          JOIN invoice_items ii ON hi.invoice_number = ii.invoice_id
           WHERE hi.store_id = $1::text
           GROUP BY ii.product_id
         )
