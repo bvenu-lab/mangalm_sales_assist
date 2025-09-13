@@ -27,13 +27,18 @@ steps:
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'grant-secret-access'
     waitFor: ['enable-apis']
-    entrypoint: 'gcloud'
+    entrypoint: 'bash'
     args:
-      - 'projects'
-      - 'add-iam-policy-binding'
-      - '$PROJECT_ID'
-      - '--member=serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com'
-      - '--role=roles/secretmanager.secretAccessor'
+      - '-c'
+      - |
+        # Get the project number dynamically
+        PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+        echo "Granting Secret Manager access to service account: $${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+
+        gcloud projects add-iam-policy-binding $PROJECT_ID \
+          --member="serviceAccount:$${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
+          --role="roles/secretmanager.secretAccessor" \
+          --condition=None
 
   # Deploy API Gateway using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
