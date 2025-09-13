@@ -9,9 +9,22 @@ options:
   substitutionOption: 'ALLOW_LOOSE'
 
 steps:
+  # Enable required APIs
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'enable-apis'
+    entrypoint: 'gcloud'
+    args:
+      - 'services'
+      - 'enable'
+      - 'sqladmin.googleapis.com'
+      - 'run.googleapis.com'
+      - 'secretmanager.googleapis.com'
+      - '--project=$PROJECT_ID'
+
   # Deploy API Gateway using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api-gateway'
+    waitFor: ['enable-apis']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
