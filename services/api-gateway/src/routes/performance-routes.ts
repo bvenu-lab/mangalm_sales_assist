@@ -68,17 +68,17 @@ export function createPerformanceRoutes(): Router {
             CASE 
               WHEN AVG(hi.total_amount) > (
                 SELECT AVG(total_amount) * 1.2 
-                FROM historical_invoices 
+                FROM mangalam_invoices 
                 WHERE invoice_date >= NOW() - INTERVAL '${interval}'
               ) THEN 0.75
               WHEN AVG(hi.total_amount) > (
                 SELECT AVG(total_amount) 
-                FROM historical_invoices 
+                FROM mangalam_invoices 
                 WHERE invoice_date >= NOW() - INTERVAL '${interval}'
               ) THEN 0.55
               ELSE 0.35
             END as upsell_success_rate
-          FROM historical_invoices hi
+          FROM mangalam_invoices hi
           WHERE hi.invoice_date >= NOW() - INTERVAL '${interval}'
           GROUP BY ${groupBy}
           ORDER BY period_date DESC
@@ -150,7 +150,7 @@ export function createPerformanceRoutes(): Router {
                 COUNT(DISTINCT hi.id) as total_orders,
                 SUM(hi.total_amount) as total_sales,
                 AVG(hi.total_amount) as avg_order_value
-              FROM historical_invoices hi
+              FROM mangalam_invoices hi
               WHERE hi.invoice_date >= NOW() - INTERVAL '30 days'
               GROUP BY EXTRACT(HOUR FROM hi.invoice_date) % 5
             )
@@ -172,7 +172,7 @@ export function createPerformanceRoutes(): Router {
               EXTRACT(HOUR FROM hi.invoice_date) as hour,
               COUNT(*)::INTEGER as orders,
               CAST(SUM(hi.total_amount) AS FLOAT) as sales
-            FROM historical_invoices hi
+            FROM mangalam_invoices hi
             WHERE hi.invoice_date >= NOW() - INTERVAL '7 days'
             GROUP BY EXTRACT(HOUR FROM hi.invoice_date)
             ORDER BY hour
@@ -189,7 +189,7 @@ export function createPerformanceRoutes(): Router {
               COUNT(DISTINCT ii.invoice_id)::INTEGER as "orderCount"
             FROM invoice_items ii
             JOIN products p ON ii.product_id = p.id
-            JOIN historical_invoices hi ON ii.invoice_id = hi.id
+            JOIN mangalam_invoices hi ON ii.invoice_id = hi.id
             WHERE hi.invoice_date >= NOW() - INTERVAL '30 days'
             GROUP BY p.name, p.category
             ORDER BY "totalRevenue" DESC
@@ -226,20 +226,31 @@ export function createPerformanceRoutes(): Router {
       logger.info('Fetching performance summary overview');
       
       const summaryQuery = `
-        WITH current_period AS (
+        WITH recent_date_info AS (
+          SELECT 
+            most_recent_date,
+            SUM(hi.total_amount) as most_recent_date_revenue
+          FROM mangalam_invoices hi
+          JOIN (
+            SELECT DATE(MAX(invoice_date)) as most_recent_date 
+            FROM mangalam_invoices
+          ) max_date ON DATE(hi.invoice_date) = max_date.most_recent_date
+          GROUP BY most_recent_date
+        ),
+        current_period AS (
           SELECT 
             COUNT(DISTINCT hi.id) as total_orders,
             COUNT(DISTINCT hi.store_id) as unique_customers,
             SUM(hi.total_amount) as total_revenue,
             AVG(hi.total_amount) as avg_order_value
-          FROM historical_invoices hi
+          FROM mangalam_invoices hi
           WHERE hi.invoice_date >= NOW() - INTERVAL '30 days'
         ),
         previous_period AS (
           SELECT 
             COUNT(DISTINCT hi.id) as prev_orders,
             SUM(hi.total_amount) as prev_revenue
-          FROM historical_invoices hi
+          FROM mangalam_invoices hi
           WHERE hi.invoice_date >= NOW() - INTERVAL '60 days'
             AND hi.invoice_date < NOW() - INTERVAL '30 days'
         ),
@@ -248,7 +259,7 @@ export function createPerformanceRoutes(): Router {
             COUNT(DISTINCT ii.product_id) as products_sold,
             SUM(ii.quantity) as total_units
           FROM invoice_items ii
-          JOIN historical_invoices hi ON ii.invoice_id = hi.id
+          JOIN mangalam_invoices hi ON ii.invoice_id = hi.id
           WHERE hi.invoice_date >= NOW() - INTERVAL '30 days'
         )
         SELECT 
@@ -258,6 +269,8 @@ export function createPerformanceRoutes(): Router {
           CAST(cp.avg_order_value AS FLOAT) as "avgOrderValue",
           pm.products_sold::INTEGER as "productsSold",
           pm.total_units::INTEGER as "totalUnits",
+          rdi.most_recent_date as "mostRecentDate",
+          CAST(rdi.most_recent_date_revenue AS FLOAT) as "mostRecentDateRevenue",
           CASE 
             WHEN pp.prev_orders > 0 
             THEN ROUND(((cp.total_orders - pp.prev_orders)::NUMERIC / pp.prev_orders) * 100, 1)
@@ -271,6 +284,7 @@ export function createPerformanceRoutes(): Router {
         FROM current_period cp
         CROSS JOIN previous_period pp
         CROSS JOIN product_metrics pm
+        CROSS JOIN recent_date_info rdi
       `;
       
       const result = await db.query(summaryQuery);
@@ -284,6 +298,8 @@ export function createPerformanceRoutes(): Router {
           avgOrderValue: 0,
           productsSold: 0,
           totalUnits: 0,
+          mostRecentDate: null,
+          mostRecentDateRevenue: 0,
           orderGrowth: 0,
           revenueGrowth: 0
         }

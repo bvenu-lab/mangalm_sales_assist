@@ -39,7 +39,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  LinearProgress
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -51,6 +52,8 @@ import {
   Add as AddIcon,
   ArrowBack as ArrowBackIcon,
   ArrowForward as ArrowForwardIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
   CalendarToday as CalendarIcon,
   Store as StoreIcon,
   TrendingUp as TrendingUpIcon,
@@ -85,6 +88,7 @@ import apiGatewayClient from '../../services/api-gateway-client';
 import { Store, PredictedOrder, HistoricalInvoice, CallPrioritization } from '../../types/models';
 import DocumentUpload from '../../components/documents/DocumentUpload';
 import { documentApi } from '../../services/document-api';
+import { formatCurrency } from '../../utils/formatting';
 
 interface ChartDataPoint {
   date: string;
@@ -140,13 +144,13 @@ const StoreDetailPage: React.FC = () => {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [historicalInvoices, setHistoricalInvoices] = useState<HistoricalInvoice[]>([]);
   const [callPrioritization, setCallPrioritization] = useState<CallPrioritization | null>(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
-  
+
   // Analytics state
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('month');
   const [chartType, setChartType] = useState<ChartType>('composed');
@@ -154,6 +158,92 @@ const StoreDetailPage: React.FC = () => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [productSalesData, setProductSalesData] = useState<ProductSalesData[]>([]);
   const [visibleProducts, setVisibleProducts] = useState<Set<string>>(new Set());
+
+  // CRITICAL: Create safe wrapper functions to NEVER allow null arrays
+  const safePredictedOrdersSetter = (data: any) => {
+    const safeData = Array.isArray(data) ? data : [];
+    console.log('[SAFETY] setPredictedOrders:', typeof data, Array.isArray(data), '-> setting:', safeData);
+    if (safeData === null || safeData === undefined) {
+      console.error('[CRITICAL] safePredictedOrdersSetter received null/undefined after safety check:', data);
+      setPredictedOrders([]);
+    } else {
+      setPredictedOrders(safeData);
+    }
+  };
+
+  const safeRecentOrdersSetter = (data: any) => {
+    const safeData = Array.isArray(data) ? data : [];
+    console.log('[SAFETY] setRecentOrders:', typeof data, Array.isArray(data), '-> setting:', safeData);
+    setRecentOrders(safeData);
+  };
+
+  const safeHistoricalInvoicesSetter = (data: any) => {
+    const safeData = Array.isArray(data) ? data : [];
+    console.log('[SAFETY] setHistoricalInvoices:', typeof data, Array.isArray(data), '-> setting:', safeData);
+    setHistoricalInvoices(safeData);
+  };
+
+  const safeChartDataSetter = (data: any) => {
+    const safeData = Array.isArray(data) ? data : [];
+    console.log('[SAFETY] setChartData:', typeof data, Array.isArray(data), '-> setting:', safeData);
+    setChartData(safeData);
+  };
+
+  const safeProductSalesDataSetter = (data: any) => {
+    const safeData = Array.isArray(data) ? data : [];
+    console.log('[SAFETY] setProductSalesData:', typeof data, Array.isArray(data), '-> setting:', safeData);
+    setProductSalesData(safeData);
+  };
+
+  // CRITICAL: Monitor all array states for null values AND override direct setters
+  useEffect(() => {
+    const checkArrays = () => {
+      if (predictedOrders === null) {
+        console.error('[CRITICAL NULL] predictedOrders is NULL! Forcing to empty array.');
+        setPredictedOrders([]);
+      }
+      if (recentOrders === null) {
+        console.error('[CRITICAL NULL] recentOrders is NULL! Forcing to empty array.');
+        setRecentOrders([]);
+      }
+      if (historicalInvoices === null) {
+        console.error('[CRITICAL NULL] historicalInvoices is NULL! Forcing to empty array.');
+        setHistoricalInvoices([]);
+      }
+      if (chartData === null) {
+        console.error('[CRITICAL NULL] chartData is NULL! Forcing to empty array.');
+        setChartData([]);
+      }
+      if (productSalesData === null) {
+        console.error('[CRITICAL NULL] productSalesData is NULL! Forcing to empty array.');
+        setProductSalesData([]);
+      }
+
+      // Check for non-array types
+      if (!Array.isArray(predictedOrders)) {
+        console.error('[NOT ARRAY] predictedOrders is not array:', typeof predictedOrders, predictedOrders);
+        setPredictedOrders([]);
+      }
+      if (!Array.isArray(recentOrders)) {
+        console.error('[NOT ARRAY] recentOrders is not array:', typeof recentOrders, recentOrders);
+        setRecentOrders([]);
+      }
+      if (!Array.isArray(historicalInvoices)) {
+        console.error('[NOT ARRAY] historicalInvoices is not array:', typeof historicalInvoices, historicalInvoices);
+        setHistoricalInvoices([]);
+      }
+      if (!Array.isArray(chartData)) {
+        console.error('[NOT ARRAY] chartData is not array:', typeof chartData, chartData);
+        setChartData([]);
+      }
+      if (!Array.isArray(productSalesData)) {
+        console.error('[NOT ARRAY] productSalesData is not array:', typeof productSalesData, productSalesData);
+        setProductSalesData([]);
+      }
+    };
+    checkArrays();
+  }, [predictedOrders, recentOrders, historicalInvoices, chartData, productSalesData]);
+
   const [showTotalRevenue, setShowTotalRevenue] = useState(true);
   const [showOrderCount, setShowOrderCount] = useState(true);
   const [showAvgOrderValue, setShowAvgOrderValue] = useState(false);
@@ -172,7 +262,7 @@ const StoreDetailPage: React.FC = () => {
       await apiGatewayClient.delete(`/api/orders/${orderToDelete.id}`);
       
       // Update local state to remove the deleted order
-      setRecentOrders(prev => prev.filter(o => o.id !== orderToDelete.id));
+      safeRecentOrdersSetter(recentOrders.filter(o => o.id !== orderToDelete.id));
       
       // Show success message
       console.log('Order deleted successfully');
@@ -272,7 +362,7 @@ const StoreDetailPage: React.FC = () => {
     // Process product data
     const products: ProductSalesData[] = Array.from(productData.entries()).map(([name, periods], index) => {
       const color = `hsl(${(index * 360) / productData.size}, 70%, 50%)`;
-      const data = chartPoints.map(point => ({
+      const data = (chartPoints || []).map(point => ({
         date: point.date,
         quantity: periods.get(point.date)?.quantity || 0,
         revenue: periods.get(point.date)?.revenue || 0
@@ -286,9 +376,9 @@ const StoreDetailPage: React.FC = () => {
     });
     
     // Add product data to chart points
-    chartPoints.forEach(point => {
-      products.forEach(product => {
-        const productPoint = product.data.find(p => p.date === point.date);
+    (chartPoints || []).forEach(point => {
+      (products || []).forEach(product => {
+        const productPoint = (product.data || []).find(p => p.date === point.date);
         if (productPoint) {
           point[`${product.productName}_quantity`] = productPoint.quantity;
           point[`${product.productName}_revenue`] = productPoint.revenue;
@@ -296,8 +386,10 @@ const StoreDetailPage: React.FC = () => {
       });
     });
     
-    setChartData(chartPoints);
-    setProductSalesData(products);
+    console.log('[StoreDetailPage] Setting chart data:', chartPoints, 'isArray:', Array.isArray(chartPoints));
+    console.log('[StoreDetailPage] Setting product sales data:', products, 'isArray:', Array.isArray(products));
+    safeChartDataSetter(chartPoints);
+    safeProductSalesDataSetter(products);
     setVisibleProducts(new Set(products.slice(0, 5).map(p => p.productName)));
   };
   
@@ -305,11 +397,13 @@ const StoreDetailPage: React.FC = () => {
   useEffect(() => {
     // Reset state when ID changes
     setStore(null);
-    setPredictedOrders([]);
-    setHistoricalInvoices([]);
+    safePredictedOrdersSetter([]);
+    safeRecentOrdersSetter([]);
+    safeHistoricalInvoicesSetter([]);
     setCallPrioritization(null);
-    setChartData([]);
-    setProductSalesData([]);
+    safeChartDataSetter([]);
+    safeProductSalesDataSetter([]);
+    setVisibleProducts(new Set());
     setError(null);
     
     let mounted = true;
@@ -356,17 +450,20 @@ const StoreDetailPage: React.FC = () => {
             createdAt: order.created_at || order.createdAt || new Date().toISOString(),
             updatedAt: order.updated_at || order.updatedAt
           })) : [];
-        setPredictedOrders(mappedOrders);
+        console.log('[StoreDetailPage] Setting predicted orders:', mappedOrders, 'isArray:', Array.isArray(mappedOrders));
+        safePredictedOrdersSetter(mappedOrders);
         
         // Fetch recent actual orders for this store
         console.log('[StoreDetailPage] Fetching recent actual orders for store:', id);
         try {
           const recentOrdersResponse = await apiGatewayClient.get(`/api/orders/recent?store_id=${id}&limit=20`);
-          console.log('[StoreDetailPage] Recent orders response:', recentOrdersResponse.data);
-          setRecentOrders(recentOrdersResponse.data || []);
+          console.log('[StoreDetailPage] Recent orders response:', recentOrdersResponse);
+          const recentOrdersData = recentOrdersResponse?.data;
+          console.log('[StoreDetailPage] Recent orders data type:', typeof recentOrdersData, 'isArray:', Array.isArray(recentOrdersData), 'value:', recentOrdersData);
+          safeRecentOrdersSetter(recentOrdersData);
         } catch (err) {
           console.error('[StoreDetailPage] Failed to fetch recent orders:', err);
-          setRecentOrders([]);
+          safeRecentOrdersSetter([]);
         }
         
         // Fetch historical invoices for this store
@@ -399,7 +496,8 @@ const StoreDetailPage: React.FC = () => {
           };
         }) : [];
         console.log('[StoreDetailPage] Mapped invoices:', mappedInvoices);
-        setHistoricalInvoices(mappedInvoices);
+        console.log('[StoreDetailPage] Setting historical invoices:', mappedInvoices, 'isArray:', Array.isArray(mappedInvoices));
+        safeHistoricalInvoicesSetter(mappedInvoices);
         
         // Fetch call prioritization for this store
         console.log('[StoreDetailPage] Fetching call prioritization...');
@@ -430,9 +528,9 @@ const StoreDetailPage: React.FC = () => {
         
         // Determine best time window based on data range and process chart data
         if (mappedInvoices.length > 0) {
-          const dates = mappedInvoices.map((inv: any) => new Date(inv.invoiceDate));
-          const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+          const dates = (mappedInvoices || []).map((inv: any) => new Date(inv.invoiceDate));
+          const minDate = new Date(Math.min(...(dates || []).map(d => d.getTime())));
+          const maxDate = new Date(Math.max(...(dates || []).map(d => d.getTime())));
           const daysDiff = (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24);
           
           let defaultWindow: TimeWindow = 'month';
@@ -516,7 +614,7 @@ const StoreDetailPage: React.FC = () => {
       return (
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2">{label}</Typography>
-          {payload.map((entry: any, index: number) => (
+          {(payload || []).map((entry: any, index: number) => (
             <Typography key={index} variant="body2" style={{ color: entry.color }}>
               {entry.name}: {typeof entry.value === 'number' ? 
                 (entry.name.includes('Revenue') || entry.name.includes('Value') ? 
@@ -546,74 +644,115 @@ const StoreDetailPage: React.FC = () => {
     }
   };
 
-  // Handle navigation to previous priority call
-  const handlePreviousPriorityCall = async () => {
+  // Handle navigation up the priority list (to higher priority)
+  const handleUpPriorityCall = async () => {
     try {
-      console.log('[StoreDetailPage] Fetching previous priority for store:', id);
-      const response = await apiGatewayClient.get(`/api/calls/previous-priority/${id}`);
-      console.log('[StoreDetailPage] Previous priority full response:', {
-        data: response?.data,
-        status: response?.status,
-        success: response?.data?.success,
-        storeData: response?.data?.data
-      });
-      
-      // Check for data in success wrapper first, then direct fields
-      const previousStoreId = response?.data?.data?.storeId || 
-                              response?.data?.data?.store_id || 
-                              response?.data?.storeId || 
-                              response?.data?.store_id;
-      
-      console.log('[StoreDetailPage] Extracted previousStoreId:', previousStoreId);
-      
-      if (previousStoreId) {
-        console.log('[StoreDetailPage] Navigating to previous store:', previousStoreId);
-        navigate(`/stores/${previousStoreId}`);
-      } else {
-        console.log('[StoreDetailPage] No previous priority store found in response');
-        console.log('[StoreDetailPage] Full response data:', JSON.stringify(response?.data));
-        // Try to at least go to the first store in the priority list
-        const fallbackResponse = await apiGatewayClient.get('/api/calls/prioritized?limit=1');
-        const fallbackStoreId = fallbackResponse?.data?.data?.[0]?.storeId;
-        if (fallbackStoreId && fallbackStoreId !== id) {
-          console.log('[StoreDetailPage] Using fallback store:', fallbackStoreId);
-          navigate(`/stores/${fallbackStoreId}`);
-        } else {
-          navigate('/calls');
-        }
+      console.log('[StoreDetailPage] Fetching prioritized calls list for UP navigation');
+
+      // Get the prioritized calls list
+      const response = await apiGatewayClient.get('/api/calls/prioritized?limit=100');
+      const responseData = response?.data;
+      const prioritizedCalls = Array.isArray(responseData?.data) ? responseData.data :
+                              Array.isArray(responseData) ? responseData : [];
+
+      if (!prioritizedCalls || prioritizedCalls.length === 0) {
+        console.log('[StoreDetailPage] No prioritized calls available');
+        alert('No prioritized calls available');
+        return;
+      }
+
+      console.log('[StoreDetailPage] Prioritized calls:', prioritizedCalls.length);
+
+      // Find current store index in the list
+      const currentIndex = prioritizedCalls.findIndex((call: any) =>
+        String(call.storeId) === String(id) || String(call.store_id) === String(id)
+      );
+
+      console.log('[StoreDetailPage] Current store index:', currentIndex);
+
+      if (currentIndex > 0) {
+        // Navigate UP to higher priority (previous in list)
+        const higherPriorityCall = prioritizedCalls[currentIndex - 1];
+        const higherPriorityStoreId = higherPriorityCall.storeId || higherPriorityCall.store_id;
+        console.log('[StoreDetailPage] Navigating UP to higher priority store:', higherPriorityStoreId);
+        navigate(`/stores/${higherPriorityStoreId}`);
+        window.scrollTo(0, 0);
+      } else if (currentIndex === 0) {
+        // Already at highest priority (peak)
+        console.log('[StoreDetailPage] Already at highest priority store (peak)');
+        alert('Already at highest priority store');
+      } else if (prioritizedCalls.length > 0) {
+        // Current store not in list, go to highest priority
+        const highestPriorityStoreId = prioritizedCalls[0].storeId || prioritizedCalls[0].store_id;
+        console.log('[StoreDetailPage] Current store not in priority list, going to highest priority:', highestPriorityStoreId);
+        navigate(`/stores/${highestPriorityStoreId}`);
+        window.scrollTo(0, 0);
       }
     } catch (error) {
-      console.error('Error fetching previous priority call:', error);
-      navigate('/calls');
+      console.error('Error fetching prioritized calls for UP navigation:', error);
+      alert('Unable to navigate: Error loading priority data');
     }
   };
 
-  // Handle navigation to next priority call
-  const handleNextPriorityCall = async () => {
+  // Handle navigation down the priority list (to lower priority)
+  const handleDownPriorityCall = async () => {
     try {
-      const response = await apiGatewayClient.get(`/api/calls/next-priority/${id}`);
-      console.log('[StoreDetailPage] Next priority response:', response);
-      
-      // Check for both storeId and store_id for compatibility
-      const nextStoreId = response?.data?.storeId || response?.data?.store_id;
-      
-      if (nextStoreId) {
-        console.log('[StoreDetailPage] Navigating to next store:', nextStoreId);
-        navigate(`/stores/${nextStoreId}`);
-      } else {
-        console.log('[StoreDetailPage] No next priority store found, going to calls list');
-        // No next priority, go to calls list
-        navigate('/calls');
+      console.log('[StoreDetailPage] Fetching prioritized calls list for DOWN navigation');
+
+      // Get the prioritized calls list
+      const response = await apiGatewayClient.get('/api/calls/prioritized?limit=100');
+      const responseData = response?.data;
+      const prioritizedCalls = Array.isArray(responseData?.data) ? responseData.data :
+                              Array.isArray(responseData) ? responseData : [];
+
+      if (!prioritizedCalls || prioritizedCalls.length === 0) {
+        console.log('[StoreDetailPage] No prioritized calls available');
+        alert('No prioritized calls available');
+        return;
+      }
+
+      console.log('[StoreDetailPage] Prioritized calls:', prioritizedCalls.length);
+
+      // Find current store index in the list
+      const currentIndex = prioritizedCalls.findIndex((call: any) =>
+        String(call.storeId) === String(id) || String(call.store_id) === String(id)
+      );
+
+      console.log('[StoreDetailPage] Current store index:', currentIndex);
+
+      if (currentIndex >= 0 && currentIndex < prioritizedCalls.length - 1) {
+        // Navigate DOWN to lower priority (next in list)
+        const lowerPriorityCall = prioritizedCalls[currentIndex + 1];
+        const lowerPriorityStoreId = lowerPriorityCall.storeId || lowerPriorityCall.store_id;
+        console.log('[StoreDetailPage] Navigating DOWN to lower priority store:', lowerPriorityStoreId);
+        navigate(`/stores/${lowerPriorityStoreId}`);
+        window.scrollTo(0, 0);
+      } else if (currentIndex === prioritizedCalls.length - 1) {
+        // Already at lowest priority (valley)
+        console.log('[StoreDetailPage] Already at lowest priority store (valley)');
+        alert('Already at lowest priority store');
+      } else if (prioritizedCalls.length > 0) {
+        // Current store not in list, go to highest priority (start of list)
+        const highestPriorityStoreId = prioritizedCalls[0].storeId || prioritizedCalls[0].store_id;
+        console.log('[StoreDetailPage] Current store not in priority list, going to highest priority:', highestPriorityStoreId);
+        navigate(`/stores/${highestPriorityStoreId}`);
+        window.scrollTo(0, 0);
       }
     } catch (error) {
-      console.error('Error fetching next priority call:', error);
-      navigate('/calls');
+      console.error('Error fetching prioritized calls for DOWN navigation:', error);
+      alert('Unable to navigate: Error loading priority data');
     }
   };
   
   // Navigate to order detail
   const handleOrderClick = (orderId: string) => {
-    navigate(`/orders/${orderId}`);
+    // Check if it's a UUID (predicted order) or integer ID (regular order)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+    if (isUuid) {
+      navigate(`/predicted-orders/${orderId}`);
+    } else {
+      navigate(`/orders/${orderId}`);
+    }
   };
   
   // Navigate to invoice detail
@@ -834,20 +973,20 @@ const StoreDetailPage: React.FC = () => {
                     <Button
                       variant="outlined"
                       color="secondary"
-                      startIcon={<ArrowBackIcon />}
-                      onClick={handlePreviousPriorityCall}
+                      startIcon={<ArrowUpwardIcon />}
+                      onClick={handleUpPriorityCall}
                       sx={{ flex: 1 }}
                     >
-                      Previous Store
+                      Up (Higher Priority)
                     </Button>
                     <Button
                       variant="outlined"
                       color="secondary"
-                      endIcon={<ArrowForwardIcon />}
-                      onClick={handleNextPriorityCall}
+                      endIcon={<ArrowDownwardIcon />}
+                      onClick={handleDownPriorityCall}
                       sx={{ flex: 1 }}
                     >
-                      Next Store
+                      Down (Lower Priority)
                     </Button>
                   </Box>
                   <Button
@@ -894,21 +1033,6 @@ const StoreDetailPage: React.FC = () => {
             {/* Controls */}
             <Grid item xs={12}>
               <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Time Period</InputLabel>
-                  <Select
-                    value={timeWindow}
-                    onChange={handleTimeWindowChange}
-                    label="Time Period"
-                  >
-                    <MenuItem value="week">Weekly</MenuItem>
-                    <MenuItem value="month">Monthly</MenuItem>
-                    <MenuItem value="quarter">Quarterly</MenuItem>
-                    <MenuItem value="year">Yearly</MenuItem>
-                    <MenuItem value="all">All Time</MenuItem>
-                  </Select>
-                </FormControl>
-                
                 <ToggleButtonGroup
                   value={chartType}
                   exclusive
@@ -928,7 +1052,7 @@ const StoreDetailPage: React.FC = () => {
                     <CompareArrowsIcon sx={{ mr: 0.5 }} /> Combined
                   </ToggleButton>
                 </ToggleButtonGroup>
-                
+
                 <FormControl size="small" sx={{ minWidth: 150 }}>
                   <InputLabel>Comparison</InputLabel>
                   <Select
@@ -944,15 +1068,40 @@ const StoreDetailPage: React.FC = () => {
                 </FormControl>
               </Box>
             </Grid>
-            
+
             {/* Main Chart */}
             <Grid item xs={12} lg={9}>
               <Paper elevation={2} sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Sales Performance
-                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    Sales Performance
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={timeWindow}
+                    exclusive
+                    onChange={(event, newValue) => {
+                      if (newValue !== null) {
+                        setTimeWindow(newValue);
+                      }
+                    }}
+                    size="small"
+                    sx={{
+                      '& .MuiToggleButton-root': {
+                        px: 2,
+                        py: 0.5,
+                        textTransform: 'none'
+                      }
+                    }}
+                  >
+                    <ToggleButton value="week">Week</ToggleButton>
+                    <ToggleButton value="month">Month</ToggleButton>
+                    <ToggleButton value="quarter">Quarter</ToggleButton>
+                    <ToggleButton value="year">Year</ToggleButton>
+                    <ToggleButton value="all">All</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
                 
-                {chartData.length === 0 ? (
+                {!chartData || chartData.length === 0 ? (
                   <Alert severity="info">No sales data available for the selected period</Alert>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
@@ -977,7 +1126,7 @@ const StoreDetailPage: React.FC = () => {
                         )}
                         
                         {/* Add product lines if visible */}
-                        {productSalesData.filter(p => visibleProducts.has(p.productName)).map(product => (
+                        {(productSalesData || []).filter(p => visibleProducts && visibleProducts.has(p.productName)).map(product => (
                           <Line
                             key={product.productName}
                             yAxisId="right"
@@ -990,7 +1139,7 @@ const StoreDetailPage: React.FC = () => {
                         ))}
                         
                         {/* Add comparison reference lines if enabled */}
-                        {comparisonMode === 'yoy' && chartData.length > 12 && (
+                        {comparisonMode === 'yoy' && chartData && chartData.length > 12 && (
                           <ReferenceLine
                             yAxisId="left"
                             y={chartData[chartData.length - 13]?.totalRevenue || 0}
@@ -1019,7 +1168,7 @@ const StoreDetailPage: React.FC = () => {
                         )}
                         
                         {/* Add product lines */}
-                        {productSalesData.filter(p => visibleProducts.has(p.productName)).map(product => (
+                        {(productSalesData || []).filter(p => visibleProducts && visibleProducts.has(p.productName)).map(product => (
                           <Line
                             key={product.productName}
                             type="monotone"
@@ -1048,7 +1197,7 @@ const StoreDetailPage: React.FC = () => {
                         )}
                         
                         {/* Add product bars */}
-                        {productSalesData.filter(p => visibleProducts.has(p.productName)).map(product => (
+                        {(productSalesData || []).filter(p => visibleProducts && visibleProducts.has(p.productName)).map(product => (
                           <Bar
                             key={product.productName}
                             dataKey={`${product.productName}_quantity`}
@@ -1076,7 +1225,7 @@ const StoreDetailPage: React.FC = () => {
                         )}
                         
                         {/* Add product areas */}
-                        {productSalesData.filter(p => visibleProducts.has(p.productName)).map(product => (
+                        {(productSalesData || []).filter(p => visibleProducts && visibleProducts.has(p.productName)).map(product => (
                           <Area
                             key={product.productName}
                             type="monotone"
@@ -1138,14 +1287,14 @@ const StoreDetailPage: React.FC = () => {
                   />
                 </FormGroup>
                 
-                {productSalesData.length > 0 && (
+                {productSalesData && productSalesData.length > 0 && (
                   <>
                     <Divider sx={{ my: 2 }} />
                     <Typography variant="subtitle2" gutterBottom>
                       Products
                     </Typography>
                     <FormGroup>
-                      {productSalesData.map(product => (
+                      {(productSalesData || []).map(product => (
                         <FormControlLabel
                           key={product.productName}
                           control={
@@ -1180,9 +1329,9 @@ const StoreDetailPage: React.FC = () => {
                         Total Revenue
                       </Typography>
                       <Typography variant="h5">
-                        ${chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0).toFixed(2)}
+                        ${chartData ? chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0).toFixed(2) : '0.00'}
                       </Typography>
-                      {comparisonMode === 'yoy' && chartData.length > 12 && chartData[chartData.length - 13]?.totalRevenue > 0 && (
+                      {comparisonMode === 'yoy' && chartData && chartData.length > 12 && chartData[chartData.length - 13]?.totalRevenue > 0 && (
                         <Typography variant="body2" color={chartData[chartData.length - 1]?.totalRevenue > chartData[chartData.length - 13]?.totalRevenue ? 'success.main' : 'error.main'}>
                           {(((chartData[chartData.length - 1]?.totalRevenue || 0) - (chartData[chartData.length - 13]?.totalRevenue || 0)) / chartData[chartData.length - 13].totalRevenue * 100).toFixed(1)}% YoY
                         </Typography>
@@ -1197,7 +1346,7 @@ const StoreDetailPage: React.FC = () => {
                         Total Orders
                       </Typography>
                       <Typography variant="h5">
-                        {chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0)}
+                        {chartData ? chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0) : 0}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1209,7 +1358,7 @@ const StoreDetailPage: React.FC = () => {
                         Average Order Value
                       </Typography>
                       <Typography variant="h5">
-                        ${(chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0) / Math.max(1, chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0))).toFixed(2)}
+                        ${chartData && chartData.length > 0 ? (chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0) / Math.max(1, chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0))).toFixed(2) : '0.00'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1221,7 +1370,7 @@ const StoreDetailPage: React.FC = () => {
                         Peak Month
                       </Typography>
                       <Typography variant="h5">
-                        {chartData.reduce((peak, d) => (d?.totalRevenue || 0) > (peak?.totalRevenue || 0) ? d : peak, chartData[0])?.date || 'N/A'}
+                        {chartData && chartData.length > 0 ? chartData.reduce((peak, d) => (d?.totalRevenue || 0) > (peak?.totalRevenue || 0) ? d : peak, chartData[0])?.date || 'N/A' : 'N/A'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1246,70 +1395,232 @@ const StoreDetailPage: React.FC = () => {
               Create New Order
             </Button>
           </Box>
-          
-          {predictedOrders.length === 0 ? (
+
+          {!predictedOrders || predictedOrders.length === 0 ? (
             <Alert severity="info">
               No predicted orders available for this store.
             </Alert>
           ) : (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><Typography variant="subtitle2">Date</Typography></TableCell>
-                    <TableCell><Typography variant="subtitle2">Items</Typography></TableCell>
-                    <TableCell><Typography variant="subtitle2">Status</Typography></TableCell>
-                    <TableCell><Typography variant="subtitle2">Notes</Typography></TableCell>
-                    <TableCell align="right"><Typography variant="subtitle2">Actions</Typography></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {predictedOrders.map((order) => (
-                    <TableRow 
-                      key={order.id} 
-                      hover 
-                      onClick={() => handleOrderClick(order.id)}
-                      sx={{ cursor: 'pointer' }}
-                    >
-                      <TableCell>
-                        {new Date(order.predictionDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {order.items?.length || 0} items
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
+            <Box>
+              {(predictedOrders || []).map((order) => (
+                <Card key={order.id} sx={{ mb: 3 }}>
+                  <CardContent>
+                    {/* Order Header */}
+                    <Grid container spacing={2} alignItems="center" mb={2}>
+                      <Grid item xs={12} md={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          Prediction Date
+                        </Typography>
+                        <Typography variant="h6">
+                          {new Date(order.predictionDate).toLocaleDateString()}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          Confidence Score
+                        </Typography>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="h6">
+                            {((order.confidenceScore || 0) * 100).toFixed(1)}%
+                          </Typography>
+                          <Chip
+                            label={
+                              (order.confidenceScore || 0) >= 0.8 ? 'High' :
+                              (order.confidenceScore || 0) >= 0.6 ? 'Medium' : 'Low'
+                            }
+                            color={
+                              (order.confidenceScore || 0) >= 0.8 ? 'success' :
+                              (order.confidenceScore || 0) >= 0.6 ? 'warning' : 'default'
+                            }
+                            size="small"
+                          />
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          Estimated Value
+                        </Typography>
+                        <Typography variant="h6" color="primary">
+                          {formatCurrency((order as any).estimatedValue || (order as any).estimated_value || 0)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          Status
+                        </Typography>
+                        <Chip
                           label={order.status}
                           color={
-                            order.status === 'Completed' ? 'success' : 
-                            order.status === 'Confirmed' ? 'primary' : 
+                            order.status === 'Completed' ? 'success' :
+                            order.status === 'Confirmed' ? 'primary' :
+                            order.status === 'Cancelled' ? 'error' :
                             'default'
                           }
-                          size="small" 
                         />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                          {order.notes || 'No notes'}
+                      </Grid>
+                    </Grid>
+
+                    {/* AI Prediction Analysis with Justification and Reasoning */}
+                    {((order as any).justification || (order as any).reasoning || (order as any).ai_recommendation || order.notes) && (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        <AlertTitle>AI Prediction Analysis</AlertTitle>
+
+                        {/* Justification - Why this prediction was made */}
+                        {(order as any).justification && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                              Justification
+                            </Typography>
+                            <Typography variant="body2" paragraph>
+                              {(order as any).justification}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {/* Reasoning - Step-by-step logic */}
+                        {(order as any).reasoning && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                              Reasoning Process
+                            </Typography>
+                            <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-line' }}>
+                              {(order as any).reasoning}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {/* Data Sources */}
+                        {(order as any).data_sources && Array.isArray((order as any).data_sources) && (order as any).data_sources.length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                              Data Sources
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={1}>
+                              {((order as any).data_sources || []).map((source: any, idx: number) => (
+                                <Chip
+                                  key={idx}
+                                  label={`${source.type}: ${(source.weight * 100).toFixed(0)}%`}
+                                  size="small"
+                                  variant="outlined"
+                                  color={source.weight > 0.3 ? "primary" : "default"}
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+
+                        {/* Pattern Indicators */}
+                        {(order as any).pattern_indicators && Array.isArray((order as any).pattern_indicators) && (order as any).pattern_indicators.length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                              Pattern Indicators
+                            </Typography>
+                            {((order as any).pattern_indicators || []).map((pattern: any, idx: number) => (
+                              <Box key={idx} display="flex" alignItems="center" gap={1} mb={0.5}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={pattern.strength * 100}
+                                  sx={{ width: 100, height: 6 }}
+                                  color={pattern.strength > 0.7 ? "success" : "warning"}
+                                />
+                                <Typography variant="caption">
+                                  {pattern.pattern}: {pattern.description}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+
+                        {/* Legacy AI Recommendation field for backward compatibility */}
+                        {!(order as any).justification && !(order as any).reasoning && ((order as any).ai_recommendation || order.notes) && (
+                          <Typography variant="body2" paragraph>
+                            <strong>AI Recommendation:</strong> {(order as any).ai_recommendation || order.notes}
+                          </Typography>
+                        )}
+
+                        {/* Prediction Model */}
+                        {(order as any).prediction_model && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                            Model: {(order as any).prediction_model}
+                          </Typography>
+                        )}
+                      </Alert>
+                    )}
+
+                    {/* Predicted Items */}
+                    {order.items && order.items.length > 0 && (
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                          Predicted Items ({order.items.length})
                         </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton 
-                          color="primary" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOrderClick(order.id);
-                          }}
-                          title="View order details"
-                        >
-                          <ArrowForwardIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Product Name</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="right">Unit Price</TableCell>
+                                <TableCell align="right">Total</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(order.items || []).map((item: any, index: number) => (
+                                <TableRow key={index}>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="medium">
+                                      {item.name || item.productName || 'Unknown Product'}
+                                    </Typography>
+                                    {item.productId && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        ID: {item.productId}
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Typography variant="body2">
+                                      {item.quantity || 0}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <Typography variant="body2">
+                                      {formatCurrency(item.price || item.unitPrice || 0)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <Typography variant="body2" fontWeight="medium">
+                                      {formatCurrency((item.quantity || 0) * (item.price || item.unitPrice || 0))}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    )}
+
+                    {/* Actions */}
+                    <Box display="flex" justifyContent="flex-end" gap={1} mt={2}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => handleOrderClick(order.id)}
+                      >
+                        View Details
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<ShoppingCartIcon />}
+                        onClick={() => navigate(`/orders/create/${order.id}`)}
+                      >
+                        Create Order from Prediction
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
           )}
         </TabPanel>
         
@@ -1320,7 +1631,7 @@ const StoreDetailPage: React.FC = () => {
           </Typography>
           
           {/* Recent Orders from Document Uploads */}
-          {recentOrders.length > 0 && (
+          {recentOrders && recentOrders.length > 0 && (
             <Box mb={4}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
                 Recent Orders (From Document Uploads)
@@ -1340,7 +1651,7 @@ const StoreDetailPage: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {recentOrders.map((order) => (
+                    {(recentOrders || []).map((order) => (
                       <TableRow 
                         key={order.id} 
                         hover 
@@ -1369,7 +1680,7 @@ const StoreDetailPage: React.FC = () => {
                           {order.item_count} items ({order.total_quantity} qty)
                         </TableCell>
                         <TableCell>
-                          ₹{order.total_amount?.toLocaleString() || '0'}
+                          {formatCurrency(parseFloat(order.total_amount || '0'))}
                         </TableCell>
                         <TableCell>
                           <Chip 
@@ -1421,7 +1732,7 @@ const StoreDetailPage: React.FC = () => {
             <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
               Historical Invoices
             </Typography>
-            {historicalInvoices.length === 0 ? (
+            {!historicalInvoices || historicalInvoices.length === 0 ? (
               <Alert severity="info">
                 No historical invoices available for this store.
               </Alert>
@@ -1438,7 +1749,7 @@ const StoreDetailPage: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {historicalInvoices.map((invoice) => (
+                  {(historicalInvoices || []).map((invoice) => (
                     <TableRow 
                       key={invoice.id} 
                       hover 
@@ -1642,7 +1953,7 @@ const DocumentHistoryList: React.FC<{ storeId: string }> = ({ storeId }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {documents.map((doc) => {
+            {(documents || []).map((doc) => {
               const result = getProcessingResult(doc.documentId);
               const classification = result?.classification;
               
@@ -1866,7 +2177,7 @@ const ClassificationDetailsDialog: React.FC<{
                       <strong>Preprocessing Applied:</strong>
                     </Typography>
                     <Box display="flex" gap={1} flexWrap="wrap">
-                      {result.classification.preprocessingApplied.map((op: string, index: number) => (
+                      {(result.classification.preprocessingApplied || []).map((op: string, index: number) => (
                         <Chip key={index} label={op} size="small" variant="outlined" />
                       ))}
                     </Box>
@@ -1882,7 +2193,7 @@ const ClassificationDetailsDialog: React.FC<{
                 </Typography>
                 {result.confidenceScores.factors && (
                   <Box display="flex" flexDirection="column" gap={1}>
-                    {Object.entries(result.confidenceScores.factors).map(([key, value]: [string, any]) => (
+                    {Object.entries(result.confidenceScores.factors || {}).map(([key, value]: [string, any]) => (
                       <Box key={key} display="flex" justifyContent="space-between">
                         <Typography variant="body2">{key.replace(/([A-Z])/g, ' $1').trim()}:</Typography>
                         <Typography variant="body2" fontWeight="bold">
@@ -1900,7 +2211,7 @@ const ClassificationDetailsDialog: React.FC<{
                 <Alert severity="warning">
                   <AlertTitle>Validation Issues</AlertTitle>
                   <List dense>
-                    {result.validationErrors.map((error: any, index: number) => (
+                    {(result.validationErrors || []).map((error: any, index: number) => (
                       <ListItem key={index}>
                         <ListItemText
                           primary={error.field}

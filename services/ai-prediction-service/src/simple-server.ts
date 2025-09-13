@@ -5,7 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './utils/logger';
-import authRoutes from './routes/auth-routes';
+// Auth routes removed - no authentication needed
 import mockDataRoutes from './routes/mock-data-routes';
 import healthRoutes from './routes/health-routes';
 
@@ -42,7 +42,7 @@ app.use(morgan('combined'));
 
 // API routes
 app.use('/health', healthRoutes);
-app.use('/api/auth', authRoutes);
+// No auth routes needed
 app.use('/api', mockDataRoutes);
 app.use('/', mockDataRoutes);
 app.use('/mangalm', mockDataRoutes);

@@ -64,6 +64,20 @@ export interface InvoiceItem {
   product?: Product;
 }
 
+export interface Order {
+  id: string;
+  order_number: string;
+  store_id: string;
+  store_name: string;
+  order_date: string;
+  total_amount: string;
+  status: string;
+  item_count: string;
+  created_at: string;
+  store?: Store;
+  items?: InvoiceItem[];
+}
+
 export interface PredictedOrder {
   id: string;
   storeId: string;

@@ -35,19 +35,33 @@ Thumbs.db
 # Test files
 coverage/
 .nyc_output/
+test/
+tests/
 *.test.js
+*.test.ts
 *.spec.js
+*.spec.ts
 
 # Documentation
 README.md
 docs/
 *.md
+CLAUDE.md
+BRUTAL_TRUTH_REPORT.md
+COMPREHENSIVE_TEST_REPORT.md
+FINAL_TEST_RESULTS.md
+FEEDBACK_ASSISTANT_VERIFICATION.md
 
-# Temporary files
+# Temporary files and uploads
 temp/
 tmp/
 uploads/
 temp-uploads/
+logs/
+*.csv
+*.xlsx
+*.json
+temp_response.json
 
 # Local database
 *.db
@@ -55,3 +69,33 @@ temp-uploads/
 
 # Scripts (Windows specific)
 scripts/windows/
+*.bat
+
+# Development tools and test files
+stress-test.js
+test-*.js
+*-test.js
+*-verification.js
+*-audit.js
+comprehensive-*.js
+brutal-*.js
+final-*.js
+deep-*.js
+
+# Database scripts (for development only)
+*.sql
+populate_*.py
+create_stores.py
+migrate-*.js
+generate-*.js
+generate-*.sql
+fix-*.sql
+populate-*.sql
+
+# Docker files (not needed for buildpacks)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Disabled services
+services/zoho-integration/

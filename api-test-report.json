@@ -1,0 +1,358 @@
+{
+  "passed": [
+    {
+      "endpoint": "GET /api/stores/recent",
+      "description": "Recent stores",
+      "expected": 200,
+      "actual": 200,
+      "duration": 144,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"id\":\"4261931000002506001\",\"name\":\"Imperial Spice Restaurant Tracy\",\"coales"
+    },
+    {
+      "endpoint": "GET /api/orders/pending",
+      "description": "Pending orders",
+      "expected": 200,
+      "actual": 200,
+      "duration": 10,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[],\"total\":0}"
+    },
+    {
+      "endpoint": "GET /api/orders/recent",
+      "description": "Recent orders",
+      "expected": 200,
+      "actual": 200,
+      "duration": 10,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[]}"
+    },
+    {
+      "endpoint": "GET /api/calls/prioritized",
+      "description": "Prioritized calls",
+      "expected": 200,
+      "actual": 200,
+      "duration": 32,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"id\":\"1\",\"storeId\":\"4261931000000665698\",\"store\":{\"name\":\"Bombay Food Inc. "
+    },
+    {
+      "endpoint": "GET /api/performance/summary",
+      "description": "Performance summary",
+      "expected": 200,
+      "actual": 200,
+      "duration": 28,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":{\"callsCompleted\":\"0\",\"ordersPlaced\":\"0\",\"upsellSuccessRate\":0,\"averageOrderV"
+    },
+    {
+      "endpoint": "GET /api/analytics/trends",
+      "description": "Analytics trends",
+      "expected": 200,
+      "actual": 200,
+      "duration": 12,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[]}"
+    },
+    {
+      "endpoint": "GET /api/analytics/trends?range=30d",
+      "description": "Analytics trends 30 days",
+      "expected": 200,
+      "actual": 200,
+      "duration": 10,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[]}"
+    },
+    {
+      "endpoint": "GET /api/analytics/product-distribution",
+      "description": "Product distribution",
+      "expected": 200,
+      "actual": 200,
+      "duration": 9,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[]}"
+    },
+    {
+      "endpoint": "GET /api/analytics/performance-metrics",
+      "description": "Performance metrics",
+      "expected": 200,
+      "actual": 200,
+      "duration": 17,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":{\"total_orders\":\"0\",\"unique_stores\":\"0\",\"total_revenue\":null,\"avg_order_value"
+    },
+    {
+      "endpoint": "GET /api/analytics/insights",
+      "description": "Analytics insights",
+      "expected": 200,
+      "actual": 200,
+      "duration": 30,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"type\":\"needs_attention\",\"title\":\"Stores Needing Attention\",\"value\":\"211\",\""
+    },
+    {
+      "endpoint": "GET /api/stores",
+      "description": "List all stores",
+      "expected": 200,
+      "actual": 200,
+      "duration": 28,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"id\":\"4261931000006961845\",\"name\":\"Amit Tyagi\",\"address\":\"Amit Tyagi Addres"
+    },
+    {
+      "endpoint": "GET /api/stores/4261931000000665698",
+      "description": "Get specific store",
+      "expected": 200,
+      "actual": 200,
+      "duration": 8,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":{\"id\":\"4261931000000665698\",\"name\":\"Bombay Food Inc. Salt Lake\",\"address\":\"Bo"
+    },
+    {
+      "endpoint": "GET /api/stores/invalid-id",
+      "description": "Get invalid store (should 404)",
+      "expected": 404,
+      "actual": 404,
+      "duration": 5,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Store not found\"}"
+    },
+    {
+      "endpoint": "GET /api/stores/regions",
+      "description": "Store regions",
+      "expected": 200,
+      "actual": 200,
+      "duration": 4,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[],\"total\":0}"
+    },
+    {
+      "endpoint": "GET /api/products",
+      "description": "List all products",
+      "expected": 200,
+      "actual": 200,
+      "duration": 19,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"id\":\"bb42d234-c7a5-4058-af8a-9ae980bc2a25\",\"name\":\"PRIYAGOLD BUTTER LITE J"
+    },
+    {
+      "endpoint": "GET /api/products/categories",
+      "description": "Product categories",
+      "expected": 200,
+      "actual": 200,
+      "duration": 5,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[\"Consumer\",\"Dry\",\"Frozen\",\"General\",\"HORECA\"],\"total\":5}"
+    },
+    {
+      "endpoint": "GET /api/products/brands",
+      "description": "Product brands",
+      "expected": 200,
+      "actual": 200,
+      "duration": 4,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[\"Bikano\",\"Fun Flips\",\"Generic\",\"Govind Bhog\",\"Mangal\",\"Roasty Tasty\",\"Tops\"]"
+    },
+    {
+      "endpoint": "GET /api/sales-agent-performance/daily",
+      "description": "Daily performance",
+      "expected": 200,
+      "actual": 200,
+      "duration": 13,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[],\"period\":\"daily\",\"total\":0}"
+    },
+    {
+      "endpoint": "GET /api/sales-agent-performance/weekly",
+      "description": "Weekly performance",
+      "expected": 200,
+      "actual": 200,
+      "duration": 25,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[{\"id\":\"1\",\"date\":\"2025-08-04\",\"agentName\":\"Agent 5\",\"agentId\":\"sales_agent_2"
+    },
+    {
+      "endpoint": "GET /health",
+      "description": "Health check",
+      "expected": 200,
+      "actual": 200,
+      "duration": 4,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":{\"service\":\"Mangalm API Gateway\",\"version\":\"1.0.0\",\"status\":\"healthy\",\"timest"
+    },
+    {
+      "endpoint": "GET /gateway/status",
+      "description": "Gateway status",
+      "expected": 200,
+      "actual": 200,
+      "duration": 3,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"status\":\"operational\",\"routes\":11,\"uptime\":7119.5970854,\"memory\":{\"rss\":55906304,\"heapTotal\":37068"
+    },
+    {
+      "endpoint": "GET /api/nonexistent",
+      "description": "Non-existent endpoint",
+      "expected": 404,
+      "actual": 404,
+      "duration": 4,
+      "passed": true,
+      "hasData": true,
+      "dataType": "string",
+      "sample": "\"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head"
+    },
+    {
+      "endpoint": "POST /api/orders",
+      "description": "Invalid POST to orders",
+      "expected": [
+        400,
+        422
+      ],
+      "actual": 400,
+      "duration": 6,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Validation failed\",\"details\":[{\"type\":\"field\",\"msg\":\"Invalid value\",\"path\""
+    },
+    {
+      "endpoint": "GET /api/user-actions",
+      "description": "User actions",
+      "expected": 200,
+      "actual": 200,
+      "duration": 9,
+      "passed": true,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":true,\"data\":[],\"total\":0}"
+    }
+  ],
+  "failed": [
+    {
+      "endpoint": "GET /api/orders",
+      "description": "List all orders",
+      "expected": 200,
+      "actual": 500,
+      "duration": 30,
+      "passed": false,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Failed to retrieve orders\"}"
+    },
+    {
+      "endpoint": "GET /api/orders/analytics",
+      "description": "Order analytics",
+      "expected": 200,
+      "actual": 400,
+      "duration": 4,
+      "passed": false,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Validation failed\",\"details\":[{\"type\":\"field\",\"value\":\"analytics\",\"msg\":\"i"
+    },
+    {
+      "endpoint": "POST /api/orders/generate",
+      "description": "Generate order",
+      "expected": [
+        200,
+        201
+      ],
+      "actual": 400,
+      "duration": 26,
+      "passed": false,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Validation failed\",\"details\":[{\"type\":\"field\",\"msg\":\"extractedOrderId must"
+    },
+    {
+      "endpoint": "GET /api/sales-agent-performance/metric/revenue",
+      "description": "Revenue metric",
+      "expected": 200,
+      "actual": 400,
+      "duration": 2,
+      "passed": false,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Invalid metric specified\"}"
+    },
+    {
+      "endpoint": "GET /api/sales-agent-performance/summary/overview",
+      "description": "Performance overview",
+      "expected": 200,
+      "actual": 500,
+      "duration": 8,
+      "passed": false,
+      "hasData": true,
+      "dataType": "object",
+      "sample": "{\"success\":false,\"error\":\"Failed to fetch performance summary\"}"
+    },
+    {
+      "endpoint": "GET /api/upselling/suggestions?storeId=4261931000000665698",
+      "description": "Upselling suggestions",
+      "expected": 200,
+      "actual": 404,
+      "duration": 4,
+      "passed": false,
+      "hasData": true,
+      "dataType": "string",
+      "sample": "\"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head"
+    },
+    {
+      "endpoint": "POST /api/user-actions",
+      "description": "Create user action",
+      "expected": [
+        200,
+        201
+      ],
+      "actual": 404,
+      "duration": 3,
+      "passed": false,
+      "hasData": true,
+      "dataType": "string",
+      "sample": "\"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head"
+    }
+  ],
+  "errors": [],
+  "performance": []
+}

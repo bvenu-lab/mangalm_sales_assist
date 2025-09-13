@@ -1,12 +1,15 @@
 export const formatCurrency = (amount: number | undefined): string => {
-  if (amount === undefined || amount === null) return '₹0.00';
-  return new Intl.NumberFormat('en-IN', {
+  if (amount === undefined || amount === null) return '$0.00';
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
 };
+
+// Alias for backward compatibility and consistency
+export const formatUSD = formatCurrency;
 
 export const formatDate = (date: Date | string | undefined): string => {
   if (!date) return '';

@@ -15,7 +15,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import { dataExtractionController } from '../controllers/data-extraction.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+// Authentication removed - no auth middleware needed
 import { correlationIdMiddleware } from '../middleware/correlation-id.middleware';
 import { validationMiddleware } from '../middleware/validation.middleware';
 import { monitoringMiddleware } from '../middleware/monitoring.middleware';
@@ -188,8 +188,7 @@ router.use(monitoringMiddleware);
  */
 router.post(
   '/extract',
-  authMiddleware.authenticate,
-  authMiddleware.requireRole(['admin', 'user']),
+  // No auth required
   heavyProcessingRateLimit,
   validationMiddleware.validateJsonPayload,
   dataExtractionController.extractData.bind(dataExtractionController)
@@ -237,8 +236,7 @@ router.post(
  */
 router.post(
   '/validate-business-rules',
-  authMiddleware.authenticate,
-  authMiddleware.requireRole(['admin', 'user']),
+  // No auth required
   standardRateLimit,
   validationMiddleware.validateJsonPayload,
   dataExtractionController.validateBusinessRules.bind(dataExtractionController)
@@ -294,8 +292,7 @@ router.post(
  */
 router.post(
   '/assess-quality',
-  authMiddleware.authenticate,
-  authMiddleware.requireRole(['admin', 'user']),
+  // No auth required
   standardRateLimit,
   validationMiddleware.validateJsonPayload,
   dataExtractionController.assessQuality.bind(dataExtractionController)
@@ -380,8 +377,7 @@ router.post(
  */
 router.post(
   '/process-document',
-  authMiddleware.authenticate,
-  authMiddleware.requireRole(['admin', 'user']),
+  // No auth required
   heavyProcessingRateLimit,
   validationMiddleware.validateJsonPayload,
   dataExtractionController.processDocument.bind(dataExtractionController)
@@ -432,8 +428,7 @@ router.post(
  */
 router.get(
   '/stats',
-  authMiddleware.authenticate,
-  authMiddleware.requireRole(['admin', 'user']),
+  // No auth required
   standardRateLimit,
   dataExtractionController.getStats.bind(dataExtractionController)
 );

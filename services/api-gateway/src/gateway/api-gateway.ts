@@ -2,8 +2,10 @@ import express, { Request, Response, NextFunction } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { SimpleAuth } from '../auth/simple-auth';
-import { createAuthRoutes } from '../auth/auth-routes';
+import { createAPIRateLimit, createStrictRateLimit } from '../middleware/rate-limit';
+import { createServer } from 'http';
+import { Server as SocketServer } from 'socket.io';
+// Auth routes removed - no authentication needed
 import { createCorsConfig } from '../security/cors-config';
 import { setupEnterpriseApi } from '../api/enterprise-api-integration';
 import { createDashboardRoutes } from '../routes/dashboard-routes';
@@ -14,9 +16,12 @@ import { storeRoutes } from '../routes/store-routes';
 import { productRoutes } from '../routes/product-routes';
 import { orderRoutes, importLocalHandler } from '../routes/order-routes';
 import { documentRoutes } from '../routes/document-routes';
+import { predictedOrdersRoutes } from '../routes/predicted-orders-routes';
 import { testUploadRoutes } from '../routes/test-upload-routes';
 import { productAlertsRoutes } from '../routes/product-alerts-routes';
 import { createCompleteCRUDRoutes } from '../routes/complete-crud-routes';
+import enterpriseUploadRoutes, { setupWebSocket } from '../routes/enterprise-upload-routes';
+import { feedbackRoutes } from '../routes/feedback-routes';
 import { logger } from '../utils/logger';
 import { PortManager } from '../utils/port-manager';
 
@@ -34,8 +39,9 @@ export interface ServiceRoute {
 
 export class APIGateway {
   private app: express.Application;
+  private server: any;
+  private io: SocketServer | null = null;
   private routes: ServiceRoute[] = [];
-  private authService!: SimpleAuth;
 
   constructor() {
     this.app = express();
@@ -50,18 +56,8 @@ export class APIGateway {
   }
 
   private setupAuthentication(): void {
-    // Create auth service and routes
-    this.authService = new SimpleAuth();
-    const authRouter = createAuthRoutes(this.authService);
-    
-    // Mount auth routes at both /auth and /api/auth for compatibility
-    this.app.use('/auth', authRouter);
-    this.app.use('/api/auth', authRouter);
-
-    logger.info('Authentication system initialized', {
-      endpoints: ['/auth/login', '/auth/logout', '/auth/me', '/auth/health',
-                  '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/auth/health']
-    });
+    // No authentication needed - all endpoints are public
+    logger.info('No authentication required - all endpoints are public');
     
     // Setup document routes FIRST (WITHOUT auth for public uploads)
     this.app.use('/api/documents', documentRoutes);
@@ -78,8 +74,9 @@ export class APIGateway {
     
     // TEMPORARILY DISABLE AUTHENTICATION FOR TESTING
     // Setup dashboard routes with real database connection
+    // Mount at /api level for frontend compatibility
     const dashboardRouter = createDashboardRoutes();
-    this.app.use('/api/dashboard', dashboardRouter);
+    this.app.use('/api', dashboardRouter);
     
     // Setup performance routes  
     const performanceRouter = createPerformanceRoutes();
@@ -94,6 +91,12 @@ export class APIGateway {
     this.app.use('/api/analytics', analyticsRouter);
     logger.info('Analytics routes initialized', {
       endpoints: ['/api/analytics/trends', '/api/analytics/product-distribution', '/api/analytics/performance-metrics', '/api/analytics/insights']
+    });
+
+    // Setup feedback routes
+    this.app.use('/api', feedbackRoutes);
+    logger.info('Feedback routes initialized', {
+      endpoints: ['/api/feedback/submit', '/api/feedback/stats']
     });
     
     // Setup store routes with real database connection
@@ -115,12 +118,21 @@ export class APIGateway {
     
     // Setup product routes with real database connection
     this.app.use('/api', productRoutes);
-    
+
+    // Setup predicted orders routes BEFORE order routes to avoid :id matching
+    this.app.use('/api', predictedOrdersRoutes);
+    logger.info('Predicted orders routes initialized', {
+      endpoints: ['/api/orders/predicted', '/api/orders/pending']
+    });
+
     // Setup order routes WITHOUT authentication for testing
     this.app.use('/api', orderRoutes);
-    
+
     // Setup product alerts routes
     this.app.use('/api', productAlertsRoutes);
+    
+    // Setup enterprise upload routes with WebSocket support
+    this.app.use('/api/enterprise', enterpriseUploadRoutes);
     
     logger.info('Dashboard routes initialized', {
       endpoints: ['/api/calls/prioritized', '/api/stores/recent', '/api/orders/pending', '/api/performance/summary']
@@ -176,6 +188,19 @@ export class APIGateway {
     // CORS configuration - use secure configuration
     this.app.use(createCorsConfig());
 
+    // Apply global rate limiting - CRITICAL SECURITY FIX
+    // Standard rate limit for all API endpoints
+    this.app.use('/api/', createAPIRateLimit());
+    
+    // Stricter rate limit for sensitive operations
+    this.app.use('/api/orders/generate', createStrictRateLimit());
+    this.app.use('/api/enterprise/upload', createStrictRateLimit());
+    
+    logger.info('Rate limiting enabled', {
+      standard: '100 requests per minute for /api/*',
+      strict: '60 requests per minute for sensitive endpoints'
+    });
+
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -216,10 +241,10 @@ export class APIGateway {
       //   }
       // },
       
-      // AI Prediction Service
+      // AI Prediction Service - Using local ML algorithms (no external API calls)
       {
         path: '/api/predictions',
-        target: 'http://localhost:3006',
+        target: 'http://localhost:3001',
         auth: true,
         rateLimit: {
           windowMs: 60 * 1000, // 1 minute
@@ -240,19 +265,16 @@ export class APIGateway {
       //   target: 'http://localhost:3006',
       //   auth: true
       // },
-      {
-        path: '/api/performance',
-        target: 'http://localhost:3006',
-        auth: true
-      },
-      {
-        path: '/api/calls',
-        target: 'http://localhost:3006',
-        auth: true
-      },
+      // Performance is handled directly by API Gateway
+      // {
+      //   path: '/api/performance',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
+      // Call prioritization handled by AI service with ML algorithms
       {
         path: '/api/call-prioritization',
-        target: 'http://localhost:3006',
+        target: 'http://localhost:3001',
         auth: true
       },
       // Orders are now handled directly by API Gateway with database connection
@@ -261,22 +283,25 @@ export class APIGateway {
       //   target: 'http://localhost:3006',
       //   auth: true
       // },
-      {
-        path: '/mangalm/predicted-orders',
-        target: 'http://localhost:3006',
-        auth: true,
-        pathPrefix: '/api'
-      },
-      {
-        path: '/mangalm/invoices',
-        target: 'http://localhost:3006',
-        auth: true
-      },
-      {
-        path: '/mangalm/call-prioritization',
-        target: 'http://localhost:3006',
-        auth: true
-      },
+      // Predicted orders handled directly by API Gateway
+      // {
+      //   path: '/mangalm/predicted-orders',
+      //   target: 'http://localhost:3006',
+      //   auth: true,
+      //   pathPrefix: '/api'
+      // },
+      // Invoices handled directly by API Gateway
+      // {
+      //   path: '/mangalm/invoices',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
+      // Call prioritization handled directly by API Gateway
+      // {
+      //   path: '/mangalm/call-prioritization',
+      //   target: 'http://localhost:3006',
+      //   auth: true
+      // },
 
       // PM Agent Orchestrator
       {
@@ -323,8 +348,8 @@ export class APIGateway {
       });
     });
 
-    // Gateway status endpoint
-    this.app.get('/gateway/status', this.authService.authenticate, (req: Request, res: Response) => {
+    // Gateway status endpoint (no auth)
+    this.app.get('/gateway/status', (req: Request, res: Response) => {
       res.json({
         status: 'operational',
         routes: this.routes.length,
@@ -358,14 +383,9 @@ export class APIGateway {
       this.app.use(routePath, limiter as any);
     }
 
-    // Apply authentication if required
+    // No authentication - skip auth middleware
     if (route.auth) {
-      this.app.use(routePath, this.authService.authenticate);
-      
-      // Apply role-based authorization if specified
-      if (route.roles) {
-        this.app.use(routePath, this.authService.requireRole(route.roles));
-      }
+      console.log(`[API Gateway] Skipping authentication for ${routePath} (auth disabled)`);
     }
 
     // Create proxy middleware
@@ -390,16 +410,11 @@ export class APIGateway {
         proxyReq.setHeader('X-Gateway-Route', route.path);
         proxyReq.setHeader('X-Gateway-Timestamp', new Date().toISOString());
         
-        // Forward user context if authenticated
-        const user = this.authService.getCurrentUser(req);
-        if (user) {
-          console.log(`[API Gateway] Forwarding user context: ${user.username} (${user.role})`);
-          proxyReq.setHeader('X-User-Id', user.id);
-          proxyReq.setHeader('X-User-Role', user.role);
-          proxyReq.setHeader('X-User-Username', user.username);
-        } else {
-          console.log(`[API Gateway] No user context to forward`);
-        }
+        // Forward default user context (no auth)
+        console.log(`[API Gateway] Forwarding default user context`);
+        proxyReq.setHeader('X-User-Id', 'default-user');
+        proxyReq.setHeader('X-User-Role', 'admin');
+        proxyReq.setHeader('X-User-Username', 'default');
       },
       onProxyRes: (proxyRes: any, req: Request, res: Response) => {
         console.log(`[API Gateway] Proxy response: ${req.method} ${req.path} - Status: ${proxyRes.statusCode}`);
@@ -459,13 +474,28 @@ export class APIGateway {
     try {
       const availablePort = await portManager.preparePort();
       
-      this.app.listen(availablePort, () => {
-        logger.info('API Gateway started', {
+      // Create HTTP server
+      this.server = createServer(this.app);
+      
+      // Initialize WebSocket server
+      this.io = new SocketServer(this.server, {
+        cors: {
+          origin: '*',
+          methods: ['GET', 'POST']
+        }
+      });
+      
+      // Setup WebSocket for enterprise upload
+      setupWebSocket(this.io);
+      
+      this.server.listen(availablePort, () => {
+        logger.info('API Gateway started with WebSocket support', {
           port: availablePort,
           requestedPort: port,
           portChanged: availablePort !== port,
           routes: this.routes.length,
-          services: Object.keys(this.getServiceStatus()).length
+          services: Object.keys(this.getServiceStatus()).length,
+          websocket: true
         });
       });
     } catch (error) {

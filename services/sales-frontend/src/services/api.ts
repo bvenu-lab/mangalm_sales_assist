@@ -1,5 +1,5 @@
 import apiGatewayClient from './api-gateway-client';
-import { Store, Product, HistoricalInvoice, PredictedOrder, CallPrioritization, SalesAgentPerformance } from '../types/models';
+import { Store, Product, HistoricalInvoice, Order, PredictedOrder, CallPrioritization, SalesAgentPerformance } from '../types/models';
 
 // Define common filter parameters interface
 export interface FilterParams {
@@ -22,16 +22,6 @@ export interface PaginatedResponse<T> {
 
 // API service with typed endpoints that uses the API Gateway client
 const api = {
-  // Auth endpoints
-  auth: {
-    login: (credentials: { username: string; password: string }) => 
-      apiGatewayClient.login(credentials.username, credentials.password),
-    verify: () => 
-      apiGatewayClient.get('/auth/verify'),
-    logout: () => 
-      apiGatewayClient.logout(),
-  },
-
   // Store endpoints
   store: {
     getAll: (params?: FilterParams) => 
@@ -76,24 +66,52 @@ const api = {
       apiGatewayClient.get('/api/invoices/recent', { limit }),
   },
 
+  // Order endpoints (actual order history)
+  order: {
+    getAll: (params?: FilterParams) => {
+      // Transform parameters to match API Gateway expectations
+      const transformedParams = params ? {
+        ...params,
+        limit: params.pageSize || params.limit,
+        offset: params.page ? (params.page - 1) * (params.pageSize || params.limit || 10) : undefined,
+        sortOrder: params.sortOrder ? params.sortOrder.toUpperCase() : undefined,
+        // Remove frontend-specific params that API doesn't understand
+        pageSize: undefined,
+        page: undefined
+      } : undefined;
+
+      return apiGatewayClient.get('/api/orders', transformedParams);
+    },
+    getById: (id: string) =>
+      apiGatewayClient.get(`/api/orders/${id}`),
+    getByStore: (storeId: string, params?: FilterParams) =>
+      apiGatewayClient.get(`/api/orders`, { ...params, store_id: storeId }),
+    create: (order: any) =>
+      apiGatewayClient.post('/api/orders', order),
+    update: (id: string, changes: any) =>
+      apiGatewayClient.put(`/api/orders/${id}`, changes),
+    delete: (id: string) =>
+      apiGatewayClient.delete(`/api/orders/${id}`),
+  },
+
   // Predicted order endpoints
   predictedOrder: {
-    getAll: (params?: FilterParams) => 
-      apiGatewayClient.get('/api/orders/pending', params),
-    getById: (id: string) => 
-      apiGatewayClient.get(`/api/orders/pending/${id}`),
-    getByStore: (storeId: string, params?: FilterParams) => 
-      apiGatewayClient.get(`/api/orders/pending`, { ...params, store_id: storeId }),
-    approve: (id: string) => 
+    getAll: (params?: FilterParams) =>
+      apiGatewayClient.get('/api/orders/predicted', params),
+    getById: (id: string) =>
+      apiGatewayClient.get(`/api/orders/predicted/${id}`),
+    getByStore: (storeId: string, params?: FilterParams) =>
+      apiGatewayClient.get(`/api/orders/predicted`, { ...params, store_id: storeId }),
+    approve: (id: string) =>
       apiGatewayClient.post(`/api/orders/${id}/approve`),
-    reject: (id: string, reason: string) => 
+    reject: (id: string, reason: string) =>
       apiGatewayClient.post(`/api/orders/${id}/reject`, { reason }),
-    modify: (id: string, changes: any) => 
+    modify: (id: string, changes: any) =>
       apiGatewayClient.put(`/api/orders/${id}`, changes),
     // Aliases for modify to maintain compatibility with common CRUD naming
-    update: (id: string, changes: any) => 
+    update: (id: string, changes: any) =>
       apiGatewayClient.put(`/api/orders/${id}`, changes),
-    create: (order: Partial<PredictedOrder>) => 
+    create: (order: Partial<PredictedOrder>) =>
       apiGatewayClient.post('/api/orders', order),
   },
 
@@ -157,9 +175,6 @@ const api = {
       apiGatewayClient.get(`/api/ai-predictions/${storeId}/trends`),
   }
 };
-
-// Export the getAuthToken function
-export const getAuthToken = () => apiGatewayClient.getAuthToken();
 
 // Export the API service as default
 export default api;

@@ -35,13 +35,13 @@ export class StoreRepository {
   }): Promise<{ data: Store[]; total: number }> {
     try {
       let query = `
-        SELECT 
+        SELECT
           s.*,
-          COUNT(hi.id) as order_count,
-          MAX(hi.invoice_date) as last_order_date,
-          SUM(hi.total) as total_revenue
+          COUNT(DISTINCT mi.invoice_number) as order_count,
+          MAX(mi.invoice_date) as last_order_date,
+          SUM(mi.total) as total_revenue
         FROM stores s
-        LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
+        LEFT JOIN mangalam_invoices mi ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
         WHERE 1=1
       `;
       let countQuery = 'SELECT COUNT(DISTINCT s.id) FROM stores s WHERE 1=1';
@@ -128,7 +128,17 @@ export class StoreRepository {
    */
   async getById(id: string): Promise<Store | null> {
     try {
-      const query = 'SELECT * FROM stores WHERE id = $1';
+      const query = `
+        SELECT
+          s.*,
+          COUNT(DISTINCT mi.invoice_number) as order_count,
+          MAX(mi.invoice_date) as last_order_date,
+          SUM(mi.total) as total_revenue
+        FROM stores s
+        LEFT JOIN mangalam_invoices mi ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
+        WHERE s.id = $1
+        GROUP BY s.id
+      `;
       const result = await db.query(query, [id]);
 
       if (result.rows.length === 0) {

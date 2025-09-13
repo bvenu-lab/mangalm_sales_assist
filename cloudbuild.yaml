@@ -17,15 +17,36 @@ steps:
       ['run', 'deploy', 'mangalm-api-gateway',
        '--source', './services/api-gateway',
        '--region', '${_REGION}',
-       '--no-allow-unauthenticated',
+       '--allow-unauthenticated',
        '--port', '3007',
        '--cpu', '2',
-       '--memory', '1Gi',
+       '--memory', '2Gi',
        '--concurrency', '100',
        '--min-instances', '1',
        '--max-instances', '50',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
-       '--set-secrets', 'JWT_SECRET=jwt-secret:latest,DB_PASSWORD=db-password:latest',
+       '--timeout', '300',
+       '--set-env-vars', 'NODE_ENV=production,PORT=3007,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
+
+  # Deploy Bulk Upload API using buildpacks
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-bulk-upload-api'
+    entrypoint: gcloud
+    args:
+      ['run', 'deploy', 'mangalm-bulk-upload-api',
+       '--source', './services/bulk-upload-api',
+       '--region', '${_REGION}',
+       '--allow-unauthenticated',
+       '--port', '3009',
+       '--cpu', '2',
+       '--memory', '4Gi',
+       '--concurrency', '50',
+       '--min-instances', '0',
+       '--max-instances', '20',
+       '--timeout', '900',
+       '--set-env-vars', 'NODE_ENV=production,PORT=3009,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,REDIS_URL=redis://redis:6379',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy AI Prediction Service using buildpacks
@@ -36,14 +57,15 @@ steps:
       ['run', 'deploy', 'mangalm-ai-prediction',
        '--source', './services/ai-prediction-service',
        '--region', '${_REGION}',
-       '--no-allow-unauthenticated',
-       '--port', '3006',
+       '--allow-unauthenticated',
+       '--port', '3001',
        '--cpu', '2',
        '--memory', '2Gi',
        '--concurrency', '50',
        '--min-instances', '0',
        '--max-instances', '20',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--timeout', '300',
+       '--set-env-vars', 'NODE_ENV=production,PORT=3001,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
@@ -55,49 +77,65 @@ steps:
       ['run', 'deploy', 'mangalm-document-processor',
        '--source', './services/document-processor',
        '--region', '${_REGION}',
-       '--no-allow-unauthenticated',
+       '--allow-unauthenticated',
        '--port', '3008',
        '--cpu', '2',
        '--memory', '2Gi',
        '--concurrency', '20',
        '--min-instances', '0',
        '--max-instances', '10',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--timeout', '300',
+       '--set-env-vars', 'NODE_ENV=production,PORT=3008,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
        '--set-secrets', 'DB_PASSWORD=db-password:latest,OPENAI_API_KEY=openai-api-key:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Get the API Gateway URL
+  # Get service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'get-api-gateway-url'
-    waitFor: ['deploy-api-gateway']
+    id: 'get-service-urls'
+    waitFor: ['deploy-api-gateway', 'deploy-bulk-upload-api', 'deploy-ai-prediction', 'deploy-document-processor']
     entrypoint: bash
     args:
       - '-c'
       - |
         API_URL=$(gcloud run services describe mangalm-api-gateway --region=${_REGION} --format='value(status.url)')
-        echo "API Gateway URL: $$API_URL"
-        echo $$API_URL > /workspace/api-gateway-url.txt
+        BULK_URL=$(gcloud run services describe mangalm-bulk-upload-api --region=${_REGION} --format='value(status.url)')
+        AI_URL=$(gcloud run services describe mangalm-ai-prediction --region=${_REGION} --format='value(status.url)')
+        DOC_URL=$(gcloud run services describe mangalm-document-processor --region=${_REGION} --format='value(status.url)')
 
-  # Deploy Sales Frontend using buildpacks with API Gateway URL
+        echo "API Gateway URL: $$API_URL"
+        echo "Bulk Upload API URL: $$BULK_URL"
+        echo "AI Prediction URL: $$AI_URL"
+        echo "Document Processor URL: $$DOC_URL"
+
+        echo $$API_URL > /workspace/api-gateway-url.txt
+        echo $$BULK_URL > /workspace/bulk-upload-url.txt
+        echo $$AI_URL > /workspace/ai-prediction-url.txt
+        echo $$DOC_URL > /workspace/document-processor-url.txt
+
+  # Deploy Sales Frontend using buildpacks with service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-sales-frontend'
-    waitFor: ['get-api-gateway-url']
+    waitFor: ['get-service-urls']
     entrypoint: bash
     args:
       - '-c'
       - |
         API_URL=$(cat /workspace/api-gateway-url.txt)
+        BULK_URL=$(cat /workspace/bulk-upload-url.txt)
+        DOC_URL=$(cat /workspace/document-processor-url.txt)
+
         gcloud run deploy mangalm-sales-frontend \
           --source=./services/sales-frontend \
           --region=${_REGION} \
           --allow-unauthenticated \
           --port=3000 \
-          --cpu=1 \
-          --memory=512Mi \
+          --cpu=2 \
+          --memory=1Gi \
           --concurrency=80 \
           --min-instances=0 \
           --max-instances=10 \
-          --set-env-vars="REACT_APP_API_GATEWAY_URL=$$API_URL"
+          --timeout=300 \
+          --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL"
 
   # Zoho Integration Service - DISABLED FOR NOW
   # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

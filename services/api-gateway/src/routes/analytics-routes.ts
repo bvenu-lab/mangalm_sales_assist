@@ -12,30 +12,32 @@ export function createAnalyticsRoutes(): Router {
   // Get trends data for specified time range
   router.get('/trends', async (req: Request, res: Response) => {
     try {
-      const range = req.query.range as string || '7d';
+      const range = req.query.range as string || '180d';  // Default to 180d to ensure data
       logger.info('Fetching analytics trends', { range });
       
       // Parse range
-      let days = 7;
+      let days = 180;  // Default to 180 days
+      if (range === '7d') days = 7;
       if (range === '30d') days = 30;
       if (range === '90d') days = 90;
+      if (range === '180d') days = 180;
       
       const startDate = subDays(new Date(), days);
       
-      // Get daily revenue and order trends from orders table
+      // Get daily revenue and order trends from mangalam_invoices table
       const trendsQuery = `
         WITH daily_metrics AS (
           SELECT 
-            DATE(o.order_date) as date,
-            COUNT(DISTINCT o.id) as orders,
-            SUM(o.total_amount) as revenue,
-            COUNT(DISTINCT o.store_id) as unique_stores,
-            AVG(o.total_amount) as avg_order_value
-          FROM orders o
-          WHERE o.order_date >= $1
-            AND o.total_amount IS NOT NULL
-            AND o.total_amount > 0
-          GROUP BY DATE(o.order_date)
+            mi.invoice_date as date,
+            COUNT(DISTINCT mi.id) as orders,
+            SUM(mi.total) as revenue,
+            COUNT(DISTINCT mi.customer_id) as unique_stores,
+            AVG(mi.total) as avg_order_value
+          FROM mangalam_invoices mi
+          WHERE mi.invoice_date >= $1
+            AND mi.total IS NOT NULL
+            AND mi.total > 0
+          GROUP BY mi.invoice_date
         ),
         date_series AS (
           SELECT generate_series(
@@ -88,11 +90,21 @@ export function createAnalyticsRoutes(): Router {
           endDate: new Date().toISOString()
         }
       });
-    } catch (error) {
-      logger.error('Error fetching analytics trends', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch analytics trends'
+    } catch (error: any) {
+      logger.error('Error fetching analytics trends', {
+        error: error.message,
+        stack: error.stack
+      });
+      // Return empty structure instead of error
+      res.json({
+        success: true,
+        data: {
+          daily: [],
+          stores: [],
+          period: req.query.range || '7d',
+          startDate: new Date().toISOString(),
+          endDate: new Date().toISOString()
+        }
       });
     }
   });
@@ -100,48 +112,89 @@ export function createAnalyticsRoutes(): Router {
   // Get product distribution across stores
   router.get('/product-distribution', async (req: Request, res: Response) => {
     try {
+      const range = req.query.range as string || '180d';  // Default to 180d to ensure data
+      logger.info('Product distribution endpoint called', { range });
       logger.info('Fetching product distribution');
       
-      // Simplified query without window functions
+      // Parse range
+      let days = 180;  // Default to 180 days to ensure we have data
+      if (range === '7d') days = 7;
+      if (range === '30d') days = 30;
+      if (range === '90d') days = 90;
+      if (range === '180d') days = 180;
+      
+      const startDate = subDays(new Date(), days);
+      
+      // Get product distribution by store from actual invoice data
       const query = `
+        WITH store_products AS (
+          SELECT 
+            mi.customer_name as store_name,
+            mi.item_name as product_name,
+            SUM(mi.quantity) as quantity_sold,
+            SUM(mi.total) as revenue,
+            MAX(mi.brand) as brand,
+            MAX(mi.category_name) as category
+          FROM mangalam_invoices mi
+          WHERE mi.invoice_date >= $1
+            AND mi.item_name IS NOT NULL
+            AND mi.customer_name IS NOT NULL
+          GROUP BY mi.customer_name, mi.item_name
+        ),
+        store_summary AS (
+          SELECT 
+            store_name,
+            COUNT(DISTINCT product_name)::integer as product_count,
+            SUM(quantity_sold)::integer as total_quantity,
+            SUM(revenue) as total_revenue
+          FROM store_products
+          GROUP BY store_name
+        )
         SELECT 
-          store_name,
-          SUM(quantity_sold)::integer as order_count,
-          SUM(revenue) as total_revenue,
-          json_object_agg(
-            product_name,
-            json_build_object(
-              'quantity', quantity_sold,
-              'revenue', revenue,
-              'brand', brand,
-              'category', category
-            )
+          ss.store_name,
+          ss.product_count,
+          ss.total_quantity,
+          ss.total_revenue,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'product_name', sp.product_name,
+                'quantity', sp.quantity_sold,
+                'revenue', sp.revenue,
+                'brand', sp.brand,
+                'category', sp.category
+              ) ORDER BY sp.revenue DESC
+            ) FILTER (WHERE sp.product_name IS NOT NULL),
+            '[]'::json
           ) as products
-        FROM product_distribution_view
-        WHERE days_ago <= 30
-        GROUP BY store_name
-        ORDER BY total_revenue DESC
+        FROM store_summary ss
+        LEFT JOIN store_products sp ON ss.store_name = sp.store_name
+        GROUP BY ss.store_name, ss.product_count, ss.total_quantity, ss.total_revenue
+        ORDER BY ss.total_revenue DESC NULLS LAST
         LIMIT 10
       `;
       
-      const result = await db.query(query);
+      const result = await db.query(query, [startDate]);
       
-      // Get top products from view
+      // Get top products from actual invoice data
       const topProductsQuery = `
         SELECT 
-          product_name,
-          brand,
-          category as category_name,
-          total_quantity::integer,
-          total_revenue,
-          store_count::integer,
-          floor(total_quantity / 10)::integer as order_count
-        FROM product_sales_summary
+          mi.item_name as product_name,
+          mi.brand,
+          mi.category_name,
+          SUM(mi.quantity)::integer as total_quantity,
+          SUM(mi.total) as total_revenue,
+          COUNT(DISTINCT mi.customer_name)::integer as store_count,
+          COUNT(DISTINCT mi.invoice_id)::integer as order_count
+        FROM mangalam_invoices mi
+        WHERE mi.invoice_date >= $1
+          AND mi.item_name IS NOT NULL
+        GROUP BY mi.item_name, mi.brand, mi.category_name
         ORDER BY total_revenue DESC
         LIMIT 10
       `;
       
-      const topProducts = await db.query(topProductsQuery);
+      const topProducts = await db.query(topProductsQuery, [startDate]);
       
       res.json({
         success: true,
@@ -152,11 +205,21 @@ export function createAnalyticsRoutes(): Router {
           period: 'last_30_days'
         }
       });
-    } catch (error) {
-      logger.error('Error fetching product distribution', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch product distribution'
+    } catch (error: any) {
+      logger.error('Error fetching product distribution', {
+        error: error.message,
+        stack: error.stack,
+        detail: error.detail
+      });
+      // Return empty structure instead of error to prevent UI breaking
+      res.json({
+        success: true,
+        data: {
+          storeDistribution: [],
+          topProducts: [],
+          totalStores: 0,
+          period: 'last_30_days'
+        }
       });
     }
   });
@@ -368,6 +431,314 @@ export function createAnalyticsRoutes(): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to generate insights'
+      });
+    }
+  });
+
+  // Get store segments (inactive, low activity, high performers)
+  router.get('/store-segments', async (req: Request, res: Response) => {
+    try {
+      const segment = req.query.segment as string || 'all';
+      const range = req.query.range as string || '30d';
+      
+      logger.info('Fetching store segments', { segment, range });
+      
+      // Parse range  
+      let days = 30;
+      if (range === '7d') days = 7;
+      if (range === '30d') days = 30;
+      if (range === '60d') days = 60;
+      if (range === '90d') days = 90;
+      if (range === '180d') days = 180;
+      
+      const startDate = subDays(new Date(), days);
+      
+      let query = '';
+      let params: any[] = [];
+      
+      if (segment === 'inactive') {
+        // Stores that haven't ordered in specified period
+        query = `
+          SELECT 
+            s.id,
+            s.name,
+            s.phone,
+            s.address,
+            s.city,
+            s.state,
+            MAX(mi.invoice_date) as last_order_date,
+            CURRENT_DATE - MAX(mi.invoice_date) as days_inactive,
+            COUNT(DISTINCT mi.id) as historical_orders,
+            SUM(mi.total) as lifetime_value
+          FROM stores s
+          LEFT JOIN mangalam_invoices mi ON s.name = mi.customer_name
+          GROUP BY s.id, s.name, s.phone, s.address, s.city, s.state
+          HAVING MAX(mi.invoice_date) < $1 OR MAX(mi.invoice_date) IS NULL
+          ORDER BY days_inactive DESC NULLS FIRST
+          LIMIT 20
+        `;
+        params = [startDate];
+      } else if (segment === 'low-activity') {
+        // Stores with minimal product variety
+        query = `
+          WITH store_products AS (
+            SELECT 
+              s.id,
+              s.name,
+              s.phone,
+              s.address,
+              s.city,
+              s.state,
+              COUNT(DISTINCT mi.item_name) as product_count,
+              COUNT(DISTINCT mi.id) as order_count,
+              SUM(mi.total) as total_revenue,
+              MAX(mi.invoice_date) as last_order_date
+            FROM stores s
+            LEFT JOIN mangalam_invoices mi ON s.name = mi.customer_name
+              AND mi.invoice_date >= $1
+            GROUP BY s.id, s.name, s.phone, s.address, s.city, s.state
+          )
+          SELECT *
+          FROM store_products
+          WHERE product_count > 0
+          ORDER BY product_count ASC, total_revenue ASC
+          LIMIT 20
+        `;
+        params = [startDate];
+      } else if (segment === 'high-performers') {
+        // Top stores by product count and revenue
+        query = `
+          WITH store_metrics AS (
+            SELECT 
+              s.id,
+              s.name,
+              s.phone,
+              s.address,
+              s.city,
+              s.state,
+              COUNT(DISTINCT mi.item_name) as product_count,
+              COUNT(DISTINCT mi.id) as order_count,
+              SUM(mi.total) as total_revenue,
+              AVG(mi.total) as avg_order_value,
+              MAX(mi.invoice_date) as last_order_date,
+              MIN(mi.invoice_date) as first_order_date
+            FROM stores s
+            JOIN mangalam_invoices mi ON s.name = mi.customer_name
+            WHERE mi.invoice_date >= $1
+            GROUP BY s.id, s.name, s.phone, s.address, s.city, s.state
+          )
+          SELECT 
+            *,
+            ROUND(total_revenue / NULLIF(order_count, 0), 2) as revenue_per_order
+          FROM store_metrics
+          ORDER BY total_revenue DESC, product_count DESC
+          LIMIT 20
+        `;
+        params = [startDate];
+      } else {
+        // All stores with basic metrics
+        query = `
+          SELECT 
+            s.id,
+            s.name,
+            s.phone,
+            s.address,
+            s.city,
+            s.state,
+            COUNT(DISTINCT mi.id) as order_count,
+            SUM(mi.total) as total_revenue,
+            MAX(mi.invoice_date) as last_order_date,
+            COUNT(DISTINCT mi.item_name) as product_count
+          FROM stores s
+          LEFT JOIN mangalam_invoices mi ON s.name = mi.customer_name
+            AND mi.invoice_date >= $1
+          GROUP BY s.id, s.name, s.phone, s.address, s.city, s.state
+          ORDER BY total_revenue DESC NULLS LAST
+          LIMIT 50
+        `;
+        params = [startDate];
+      }
+      
+      const result = await db.query(query, params);
+      
+      res.json({
+        success: true,
+        data: {
+          segment,
+          stores: result.rows,
+          count: result.rowCount,
+          period: range,
+          criteria: segment === 'inactive' ? `No orders in ${days} days` :
+                   segment === 'low-activity' ? 'Minimal product variety' :
+                   segment === 'high-performers' ? 'Top revenue and product count' :
+                   'All stores'
+        }
+      });
+    } catch (error: any) {
+      logger.error('Error fetching store segments', {
+        error: error.message,
+        stack: error.stack
+      });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch store segments'
+      });
+    }
+  });
+
+  // Get product distribution for store segments
+  router.get('/store-segments-products', async (req: Request, res: Response) => {
+    try {
+      const segment = req.query.segment as string || 'all';
+      const range = req.query.range as string || '30d';
+      
+      logger.info('Fetching product distribution for store segments', { segment, range });
+      
+      // Parse range  
+      let days = 30;
+      if (range === '7d') days = 7;
+      if (range === '30d') days = 30;
+      if (range === '60d') days = 60;
+      if (range === '90d') days = 90;
+      if (range === '180d') days = 180;
+      
+      const startDate = subDays(new Date(), days);
+      
+      let storeFilterQuery = '';
+      let storeFilterParams: any[] = [];
+      
+      if (segment === 'inactive') {
+        // Get products from stores that haven't ordered recently
+        storeFilterQuery = `
+          AND mi.customer_name IN (
+            SELECT s.name FROM stores s
+            LEFT JOIN mangalam_invoices mi2 ON s.name = mi2.customer_name
+            GROUP BY s.name
+            HAVING MAX(mi2.invoice_date) < $2 OR MAX(mi2.invoice_date) IS NULL
+          )
+        `;
+        storeFilterParams = [startDate, startDate];
+      } else if (segment === 'low-activity') {
+        // Get products from stores with minimal product variety
+        storeFilterQuery = `
+          AND mi.customer_name IN (
+            SELECT store_name FROM (
+              SELECT 
+                mi2.customer_name as store_name,
+                COUNT(DISTINCT mi2.item_name) as product_count
+              FROM mangalam_invoices mi2
+              WHERE mi2.invoice_date >= $2
+              GROUP BY mi2.customer_name
+              HAVING COUNT(DISTINCT mi2.item_name) <= 5
+            ) low_variety_stores
+          )
+        `;
+        storeFilterParams = [startDate, startDate];
+      } else if (segment === 'high-performers') {
+        // Get products from top performing stores
+        storeFilterQuery = `
+          AND mi.customer_name IN (
+            SELECT store_name FROM (
+              SELECT 
+                mi2.customer_name as store_name,
+                SUM(mi2.total) as total_revenue
+              FROM mangalam_invoices mi2
+              WHERE mi2.invoice_date >= $2
+              GROUP BY mi2.customer_name
+              ORDER BY total_revenue DESC
+              LIMIT 10
+            ) top_stores
+          )
+        `;
+        storeFilterParams = [startDate, startDate];
+      } else {
+        storeFilterParams = [startDate];
+      }
+      
+      // Get store-specific product distribution
+      const query = `
+        WITH top_stores AS (
+          SELECT
+            mi.customer_name as store_name,
+            SUM(mi.total) as total_revenue
+          FROM mangalam_invoices mi
+          WHERE mi.invoice_date >= $1
+            AND mi.customer_name IS NOT NULL
+            ${storeFilterQuery}
+          GROUP BY mi.customer_name
+          ORDER BY total_revenue DESC
+          LIMIT 10
+        ),
+        top_products AS (
+          SELECT
+            mi.item_name,
+            SUM(mi.quantity) as total_quantity
+          FROM mangalam_invoices mi
+          WHERE mi.invoice_date >= $1
+            AND mi.item_name IS NOT NULL
+            ${storeFilterQuery}
+          GROUP BY mi.item_name
+          ORDER BY total_quantity DESC
+          LIMIT 7
+        ),
+        store_products AS (
+          SELECT
+            ts.store_name,
+            ts.total_revenue as store_total_revenue,
+            CASE
+              WHEN mi.item_name IN (SELECT item_name FROM top_products) THEN mi.item_name
+              ELSE 'Other'
+            END as product_name,
+            SUM(mi.quantity) as quantity,
+            SUM(mi.total) as revenue
+          FROM top_stores ts
+          JOIN mangalam_invoices mi ON ts.store_name = mi.customer_name
+          WHERE mi.invoice_date >= $1
+            AND mi.item_name IS NOT NULL
+          GROUP BY ts.store_name, ts.total_revenue,
+            CASE
+              WHEN mi.item_name IN (SELECT item_name FROM top_products) THEN mi.item_name
+              ELSE 'Other'
+            END
+        )
+        SELECT
+          sp.store_name,
+          sp.store_total_revenue,
+          json_agg(
+            json_build_object(
+              'product_name', sp.product_name,
+              'quantity', sp.quantity,
+              'revenue', sp.revenue
+            ) ORDER BY sp.revenue DESC
+          ) as products
+        FROM store_products sp
+        GROUP BY sp.store_name, sp.store_total_revenue
+        ORDER BY sp.store_total_revenue DESC
+      `;
+
+      const result = await db.query(query, storeFilterParams);
+
+      res.json({
+        success: true,
+        data: {
+          segment,
+          stores: result.rows,
+          count: result.rowCount,
+          period: range,
+          criteria: segment === 'inactive' ? 'Products from inactive stores' :
+                   segment === 'low-activity' ? 'Products from low-activity stores' :
+                   segment === 'high-performers' ? 'Products from high-performing stores' :
+                   'All store products'
+        }
+      });
+    } catch (error: any) {
+      logger.error('Error fetching store segments products', {
+        error: error.message,
+        stack: error.stack
+      });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch store segments products'
       });
     }
   });

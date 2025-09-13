@@ -72,39 +72,90 @@ export async function checkPort(port: number): Promise<PortInfo> {
 }
 
 /**
- * Kill process using a specific port
+ * Kill process using a specific port with multiple strategies
  */
 export async function killProcessOnPort(port: number): Promise<boolean> {
   try {
     const portInfo = await checkPort(port);
-    
+
     if (!portInfo.isInUse || !portInfo.pid) {
       logger.info('Port is not in use', { port });
       return true;
     }
-    
+
     logger.info('Killing process on port', {
       port,
       pid: portInfo.pid,
       processName: portInfo.processName
     });
-    
-    // Kill the process
-    await execAsync(`taskkill /PID ${portInfo.pid} /F`);
-    
-    // Wait a moment for the process to terminate
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Verify the port is now free
-    const verifyInfo = await checkPort(port);
-    if (!verifyInfo.isInUse) {
-      logger.info('Successfully killed process on port', { port });
-      return true;
-    } else {
-      logger.error('Failed to kill process on port', { port });
-      return false;
+
+    // Strategy 1: Standard taskkill with force flag
+    try {
+      await execAsync(`taskkill /PID ${portInfo.pid} /F`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const verify1 = await checkPort(port);
+      if (!verify1.isInUse) {
+        logger.info('Successfully killed process with taskkill /F', { port });
+        return true;
+      }
+    } catch (error) {
+      logger.warn('Strategy 1 failed, trying more aggressive methods', { port });
     }
-    
+
+    // Strategy 2: Kill all Node.js processes if it's a Node process
+    if (portInfo.processName === 'node.exe') {
+      try {
+        logger.info('Attempting to kill all node.exe processes', { port });
+        await execAsync(`taskkill /F /IM node.exe`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const verify2 = await checkPort(port);
+        if (!verify2.isInUse) {
+          logger.info('Successfully freed port by killing all node processes', { port });
+          return true;
+        }
+      } catch (error) {
+        logger.warn('Strategy 2 failed, trying final method', { port });
+      }
+    }
+
+    // Strategy 3: Use wmic to force terminate the process tree
+    try {
+      await execAsync(`wmic process where "ProcessId=${portInfo.pid}" delete`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const verify3 = await checkPort(port);
+      if (!verify3.isInUse) {
+        logger.info('Successfully killed process with wmic', { port });
+        return true;
+      }
+    } catch (error) {
+      logger.warn('Strategy 3 failed', { port });
+    }
+
+    // Strategy 4: Nuclear option - kill by process name if all else fails
+    if (portInfo.processName) {
+      try {
+        await execAsync(`taskkill /F /IM "${portInfo.processName}"`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const verify4 = await checkPort(port);
+        if (!verify4.isInUse) {
+          logger.info('Successfully freed port by killing all instances of process', {
+            port,
+            processName: portInfo.processName
+          });
+          return true;
+        }
+      } catch (error) {
+        logger.warn('Strategy 4 failed', { port });
+      }
+    }
+
+    logger.error('All kill strategies failed', { port, pid: portInfo.pid });
+    return false;
+
   } catch (error) {
     logger.error('Error killing process on port', {
       port,
@@ -166,26 +217,41 @@ export class PortManager {
   }
   
   /**
-   * Prepare port for service startup
+   * Prepare port for service startup - NEVER changes ports, only kills processes
    */
   async preparePort(): Promise<number> {
     logger.info(`${this.serviceName}: Preparing port ${this.preferredPort}`);
-    
+
     if (this.autoKill) {
-      const success = await ensurePortAvailable(this.preferredPort);
-      if (success) {
-        return this.preferredPort;
-      } else {
-        logger.warn(`${this.serviceName}: Failed to free preferred port, finding alternative`);
-        return await findAvailablePort(this.preferredPort + 1);
+      // Keep trying until we free the preferred port - no alternatives allowed
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        logger.info(`${this.serviceName}: Port cleanup attempt ${attempts}/${maxAttempts}`);
+
+        const success = await ensurePortAvailable(this.preferredPort);
+        if (success) {
+          logger.info(`${this.serviceName}: Successfully claimed port ${this.preferredPort}`);
+          return this.preferredPort;
+        }
+
+        if (attempts < maxAttempts) {
+          logger.warn(`${this.serviceName}: Attempt ${attempts} failed, retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
+
+      // If all attempts fail, throw an error - we don't use alternative ports
+      throw new Error(`${this.serviceName}: Failed to free port ${this.preferredPort} after ${maxAttempts} attempts. Port must be freed manually.`);
+
     } else {
       const portInfo = await checkPort(this.preferredPort);
       if (!portInfo.isInUse) {
         return this.preferredPort;
       } else {
-        logger.warn(`${this.serviceName}: Preferred port in use, finding alternative`);
-        return await findAvailablePort(this.preferredPort + 1);
+        throw new Error(`${this.serviceName}: Port ${this.preferredPort} is in use and autoKill is disabled. Cannot start service.`);
       }
     }
   }

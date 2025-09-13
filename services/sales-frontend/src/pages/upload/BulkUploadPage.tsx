@@ -41,7 +41,7 @@ const BulkUploadPage: React.FC = () => {
     setError(null);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007';
+      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3015';
       const token = localStorage.getItem('authToken');
       
       // Process each file

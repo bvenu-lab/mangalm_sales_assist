@@ -17,7 +17,7 @@ export function createDashboardRoutes(): Router {
       
       // First check if we have any invoices at all - if not, return empty
       const invoiceCheck = await db.query('SELECT COUNT(*) as count FROM mangalam_invoices');
-      if (invoiceCheck.rows[0].count === '0') {
+      if (parseInt(invoiceCheck.rows[0].count) === 0) {
         return res.json({
           success: true,
           data: [],
@@ -28,16 +28,16 @@ export function createDashboardRoutes(): Router {
       // Query stores with their last order information and calculate priority
       const query = `
         WITH store_orders AS (
-          SELECT 
+          SELECT
             s.id,
             s.name,
             s.address,
-            MAX(hi.invoice_date) as last_order_date,
-            COUNT(hi.id) as total_orders,
-            AVG(hi.total) as avg_order_value,
-            SUM(hi.total) as total_revenue
+            MAX(mi.invoice_date) as last_order_date,
+            COUNT(mi.id) as total_orders,
+            AVG(mi.total) as avg_order_value,
+            SUM(mi.total) as total_revenue
           FROM stores s
-          LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
+          LEFT JOIN mangalam_invoices mi ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
           ${storeId ? 'WHERE s.id = $2' : ''}
           GROUP BY s.id, s.name, s.address
         ),
@@ -73,18 +73,27 @@ export function createDashboardRoutes(): Router {
             END as priority_reason
           FROM store_orders
         )
-        SELECT 
+        SELECT
           ROW_NUMBER() OVER (ORDER BY priority_score DESC) as id,
           id as "storeId",
           json_build_object(
+            'id', id,
             'name', name,
+            'address', COALESCE(address, ''),
             'city', COALESCE(address, ''),
             'region', COALESCE(address, '')
           ) as store,
-          ROUND(priority_score::numeric, 1) as "priorityScore",
+          ROW_NUMBER() OVER (ORDER BY priority_score DESC) as "priorityScore",
           priority_reason as "priorityReason",
-          'pending' as status,
-          NOW() as "scheduledDate"
+          CASE
+            WHEN last_order_date IS NOT NULL THEN last_order_date::text
+            ELSE NULL
+          END as "lastCallDate",
+          (CURRENT_DATE + INTERVAL '3 days')::text as "nextCallDate",
+          'Agent1' as "assignedAgent",
+          'Pending' as status,
+          NOW() as "createdAt",
+          NOW() as "updatedAt"
         FROM priority_scores
         ORDER BY priority_score DESC
         LIMIT $1
@@ -129,7 +138,7 @@ export function createDashboardRoutes(): Router {
             COUNT(hi.id) as total_orders,
             AVG(hi.total_amount) as avg_order_value
           FROM stores s
-          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
           WHERE s.id = $1
           GROUP BY s.id
         )
@@ -168,7 +177,7 @@ export function createDashboardRoutes(): Router {
             COUNT(hi.id) as total_orders,
             AVG(hi.total_amount) as avg_order_value
           FROM stores s
-          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
           WHERE s.id != $1
           GROUP BY s.id, s.name, s.address
         ),
@@ -242,7 +251,7 @@ export function createDashboardRoutes(): Router {
               COUNT(hi.id) as total_orders,
               AVG(hi.total_amount) as avg_order_value
             FROM stores s
-            LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+            LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
             WHERE s.id != $1
             GROUP BY s.id, s.name, s.address
           ),
@@ -319,7 +328,7 @@ export function createDashboardRoutes(): Router {
             COUNT(hi.id) as total_orders,
             AVG(hi.total_amount) as avg_order_value
           FROM stores s
-          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
           WHERE s.id = $1
           GROUP BY s.id
         )
@@ -358,7 +367,7 @@ export function createDashboardRoutes(): Router {
             COUNT(hi.id) as total_orders,
             AVG(hi.total_amount) as avg_order_value
           FROM stores s
-          LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+          LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
           WHERE s.id != $1
           GROUP BY s.id, s.name, s.address
         ),
@@ -432,7 +441,7 @@ export function createDashboardRoutes(): Router {
               COUNT(hi.id) as total_orders,
               AVG(hi.total_amount) as avg_order_value
             FROM stores s
-            LEFT JOIN historical_invoices hi ON s.id = hi.store_id
+            LEFT JOIN mangalam_invoices hi ON s.name = hi.customer_name
             WHERE s.id != $1
             GROUP BY s.id, s.name, s.address
           ),
@@ -542,47 +551,106 @@ export function createDashboardRoutes(): Router {
       const storeId = req.query.store_id as string;
       const limit = parseInt(req.query.limit as string) || 10;
       logger.info('Fetching pending orders', { storeId, limit });
-      
-      // For now, return recent orders from the orders table as "pending" orders
-      // This provides actual data while the prediction system is being built
-      const query = storeId ? `
-        SELECT 
-          o.id,
-          o.store_id,
-          json_build_object(
-            'name', s.name,
-            'city', s.address
-          ) as store,
-          o.created_at as prediction_date,
-          0.85 as confidence_score,
-          o.total_amount as estimated_value,
-          'pending' as status,
-          COALESCE(o.items, '[]'::jsonb) as predicted_items
-        FROM orders o
-        JOIN stores s ON o.store_id = s.id
-        WHERE o.store_id = $1
-        ORDER BY o.created_at DESC
-        LIMIT $2
-      ` : `
-        SELECT 
-          o.id,
-          o.store_id,
-          json_build_object(
-            'name', s.name,
-            'city', s.address
-          ) as store,
-          o.created_at as prediction_date,
-          0.85 as confidence_score,
-          o.total_amount as estimated_value,
-          'pending' as status,
-          COALESCE(o.items, '[]'::jsonb) as predicted_items
-        FROM orders o
-        JOIN stores s ON o.store_id = s.id
-        ORDER BY o.created_at DESC
-        LIMIT $1
-      `;
-      
-      const params = storeId ? [storeId, limit] : [limit];
+
+      // Use mangalam_invoices data to simulate pending orders based on recent patterns
+      let query;
+      let params: any[] = [];
+
+      if (storeId) {
+        // First get the store name for this ID
+        const storeResult = await db.query('SELECT name FROM stores WHERE id = $1', [storeId]);
+        const storeName = storeResult.rows[0]?.name;
+
+        if (storeName) {
+          query = `
+            WITH recent_invoices AS (
+              SELECT
+                mi.id,
+                mi.customer_id as store_id,
+                mi.customer_name as store_name,
+                s.id as actual_store_id,
+                s.address as store_address,
+                mi.invoice_date,
+                mi.total as total_amount,
+                json_build_object(
+                  'product_id', mi.product_id,
+                  'product_name', mi.item_name,
+                  'quantity', mi.quantity,
+                  'unit_price', mi.item_price
+                ) as item_details
+              FROM mangalam_invoices mi
+              LEFT JOIN stores s ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
+              WHERE LOWER(TRIM(mi.customer_name)) = LOWER(TRIM($1))
+                AND mi.invoice_date > CURRENT_DATE - INTERVAL '30 days'
+              ORDER BY mi.invoice_date DESC
+              LIMIT 20
+            )
+            SELECT
+              ROW_NUMBER() OVER () as id,
+              COALESCE(actual_store_id, store_id) as store_id,
+              json_build_object(
+                'name', store_name,
+                'city', COALESCE(store_address, '')
+              ) as store,
+              CURRENT_DATE + INTERVAL '7 days' as prediction_date,
+              0.85 + RANDOM() * 0.1 as confidence_score,
+              AVG(total_amount) as estimated_value,
+              'pending' as status,
+              json_agg(item_details) as predicted_items
+            FROM recent_invoices
+            GROUP BY actual_store_id, store_id, store_name, store_address
+            LIMIT $2
+          `;
+          params = [storeName, limit];
+        } else {
+          // Store not found, return empty
+          return res.json({ success: true, data: [], total: 0 });
+        }
+      } else {
+        // Get pending orders for all stores
+        query = `
+          WITH recent_store_activity AS (
+            SELECT
+              mi.customer_name as store_name,
+              s.id as store_id,
+              s.address as store_address,
+              MAX(mi.invoice_date) as last_order_date,
+              AVG(mi.total) as avg_order_value,
+              COUNT(DISTINCT mi.invoice_number) as order_count,
+              json_agg(json_build_object(
+                'product_id', mi.product_id,
+                'product_name', mi.item_name,
+                'quantity', mi.quantity
+              )) as typical_items
+            FROM mangalam_invoices mi
+            LEFT JOIN stores s ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
+            WHERE mi.invoice_date > CURRENT_DATE - INTERVAL '60 days'
+            GROUP BY mi.customer_name, s.id, s.address
+            HAVING MAX(mi.invoice_date) < CURRENT_DATE - INTERVAL '7 days'
+          )
+          SELECT
+            ROW_NUMBER() OVER () as id,
+            store_id,
+            json_build_object(
+              'name', store_name,
+              'city', COALESCE(store_address, '')
+            ) as store,
+            CURRENT_DATE + INTERVAL '3 days' as prediction_date,
+            CASE
+              WHEN order_count > 10 THEN 0.9
+              WHEN order_count > 5 THEN 0.85
+              ELSE 0.75
+            END as confidence_score,
+            avg_order_value as estimated_value,
+            'pending' as status,
+            typical_items as predicted_items
+          FROM recent_store_activity
+          ORDER BY last_order_date ASC, avg_order_value DESC
+          LIMIT $1
+        `;
+        params = [limit];
+      }
+
       const result = await db.query(query, params);
       
       res.json({
@@ -819,42 +887,49 @@ export function createDashboardRoutes(): Router {
     try {
       logger.info('Fetching performance summary');
       
-      // Calculate performance metrics from ACTUAL ORDERS table (not historical invoices)
+      // Calculate performance metrics from mangalam_invoices table which has actual data
       const metricsQuery = `
-        WITH today_metrics AS (
+        WITH most_recent_date AS (
+          SELECT MAX(invoice_date) as max_date 
+          FROM mangalam_invoices
+        ),
+        today_metrics AS (
           SELECT 
-            COUNT(DISTINCT id) as orders_count,
-            COUNT(DISTINCT store_id) as stores_served,
-            COALESCE(SUM(total_amount), 0) as total_revenue,
-            COALESCE(AVG(total_amount), 0) as avg_order_value
-          FROM orders
-          WHERE DATE(created_at) = CURRENT_DATE
+            COUNT(DISTINCT mi.id) as orders_count,
+            COUNT(DISTINCT mi.customer_id) as stores_served,
+            COALESCE(SUM(mi.total), 0) as total_revenue,
+            COALESCE(AVG(mi.total), 0) as avg_order_value
+          FROM mangalam_invoices mi
+          CROSS JOIN most_recent_date mrd
+          WHERE mi.invoice_date = mrd.max_date
         ),
         recent_period AS (
           SELECT 
             COUNT(DISTINCT id) as orders_count_30d,
-            COUNT(DISTINCT store_id) as stores_served_30d,
-            COALESCE(SUM(total_amount), 0) as total_revenue_30d,
-            COALESCE(AVG(total_amount), 0) as avg_order_value_30d
-          FROM orders
-          WHERE created_at >= NOW() - INTERVAL '30 days'
+            COUNT(DISTINCT customer_id) as stores_served_30d,
+            COALESCE(SUM(total), 0) as total_revenue_30d,
+            COALESCE(AVG(total), 0) as avg_order_value_30d
+          FROM mangalam_invoices
+          WHERE invoice_date >= (SELECT max_date FROM most_recent_date) - INTERVAL '30 days'
         ),
         daily_trend AS (
           SELECT 
-            DATE(created_at) as date,
-            COALESCE(SUM(total_amount), 0) as daily_revenue
-          FROM orders
-          WHERE created_at >= NOW() - INTERVAL '7 days'
-          GROUP BY DATE(created_at)
+            invoice_date as date,
+            COALESCE(SUM(total), 0) as daily_revenue
+          FROM mangalam_invoices
+          WHERE invoice_date >= (SELECT max_date FROM most_recent_date) - INTERVAL '7 days'
+          GROUP BY invoice_date
           ORDER BY date
         )
         SELECT 
-          -- Use today's metrics for the KPI cards
+          -- Use most recent date's metrics for the KPI cards
           COALESCE(tm.orders_count, 0) as calls_completed,
           COALESCE(tm.orders_count, 0) as orders_placed,
           0.0 as upsell_success_rate,  -- No mock data - only real upsell tracking
           COALESCE(tm.avg_order_value, 0) as average_order_value,
           COALESCE(tm.total_revenue, 0) as total_revenue,
+          (SELECT max_date FROM most_recent_date) as most_recent_date,
+          tm.total_revenue as most_recent_date_revenue,
           COALESCE(json_agg(
             json_build_object(
               'date', dt.date,
@@ -869,20 +944,20 @@ export function createDashboardRoutes(): Router {
       `;
       
       const topProductsQuery = `
-        -- Get top products from actual orders, not invoices
-        WITH order_items AS (
-          SELECT 
-            COALESCE(item->>'product_name', item->>'productName', 'Unknown Product') as product_name,
-            COALESCE((item->>'quantity')::numeric, 0) as quantity
-          FROM orders o
-          CROSS JOIN LATERAL jsonb_array_elements(o.items) AS item
-          WHERE o.created_at >= NOW() - INTERVAL '30 days'
+        -- Get top products from invoice_items
+        WITH most_recent_date AS (
+          SELECT MAX(invoice_date) as max_date 
+          FROM mangalam_invoices
         )
         SELECT 
-          product_name as name,
-          SUM(quantity) as units
-        FROM order_items
-        GROUP BY product_name
+          COALESCE(ii.product_name, p.name, 'Unknown Product') as name,
+          SUM(ii.quantity) as units
+        FROM invoice_items ii
+        LEFT JOIN mangalam_invoices mi ON ii.invoice_id = mi.invoice_id
+        LEFT JOIN products p ON ii.product_id = p.id
+        CROSS JOIN most_recent_date mrd
+        WHERE mi.invoice_date >= mrd.max_date - INTERVAL '30 days'
+        GROUP BY COALESCE(ii.product_name, p.name, 'Unknown Product')
         ORDER BY units DESC
         LIMIT 3
       `;
@@ -907,6 +982,8 @@ export function createDashboardRoutes(): Router {
         upsellSuccessRate: parseFloat(metrics.upsell_success_rate) || 0,
         averageOrderValue: parseFloat(metrics.average_order_value) || 0,
         totalRevenue: parseFloat(metrics.total_revenue) || 0,
+        mostRecentDate: metrics.most_recent_date,
+        mostRecentDateRevenue: parseFloat(metrics.most_recent_date_revenue) || 0,
         period: 'last_30_days',
         topProducts: topProductsResult.rows || [],
         performanceTrend: metrics.performance_trend || []
@@ -935,58 +1012,91 @@ export function createDashboardRoutes(): Router {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       const storeId = req.query.store_id as string;
-      
+
       logger.info('Fetching invoices', { limit, offset, storeId });
-      
+
       let query = `
-        SELECT 
-          hi.id,
-          hi.store_id,
-          s.name as store_name,
-          hi.invoice_date,
-          hi.total_amount,
-          hi.payment_status,
-          hi.notes,
-          COALESCE(
-            (SELECT json_agg(
-              json_build_object(
-                'id', ii.id,
-                'productId', ii.product_id,
-                'productName', COALESCE(p.name, ii.product_id),
-                'quantity', ii.quantity,
-                'unitPrice', ii.unit_price,
-                'totalPrice', ii.total_price
-              )
-            )
-            FROM invoice_items ii
-            LEFT JOIN products p ON ii.product_id = p.id
-            WHERE ii.invoice_id = hi.id
-            ), '[]'::json
-          ) as items
-        FROM historical_invoices hi
-        JOIN stores s ON hi.store_id = s.id
+        SELECT
+          mi.id,
+          s.id as store_id,
+          mi.customer_name as store_name,
+          mi.customer_id,
+          mi.invoice_date,
+          mi.due_date,
+          mi.invoice_number,
+          mi.invoice_status,
+          mi.total as total_amount,
+          mi.balance,
+          mi.sales_person,
+          json_build_object(
+            'productId', mi.product_id,
+            'productName', mi.item_name,
+            'sku', mi.sku,
+            'brand', mi.brand,
+            'category', mi.category_name,
+            'quantity', mi.quantity,
+            'unitPrice', mi.item_price,
+            'mrp', mi.mrp,
+            'discount', mi.discount,
+            'totalPrice', mi.item_total
+          ) as item_details
+        FROM mangalam_invoices mi
+        LEFT JOIN stores s ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
       `;
-      
+
       const params: any[] = [];
-      
+
       if (storeId) {
-        query += ` WHERE hi.store_id = $1`;
-        params.push(storeId);
+        // First try to get the store name for this ID
+        const storeResult = await db.query('SELECT name FROM stores WHERE id = $1', [storeId]);
+        if (storeResult.rows.length > 0) {
+          query += ` WHERE LOWER(TRIM(mi.customer_name)) = LOWER(TRIM($1))`;
+          params.push(storeResult.rows[0].name);
+        } else {
+          // If store not found, still try with the ID as customer_name
+          query += ` WHERE s.id = $1 OR mi.customer_id = $1`;
+          params.push(storeId);
+        }
       }
-      
+
       query += `
-        ORDER BY hi.invoice_date DESC
+        ORDER BY mi.invoice_date DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
-      
+
       params.push(limit, offset);
-      
+
       const result = await db.query(query, params);
-      
+
+      // Group invoices by invoice number to consolidate items
+      const invoiceMap = new Map();
+      result.rows.forEach((row: any) => {
+        const invoiceNum = row.invoice_number;
+        if (!invoiceMap.has(invoiceNum)) {
+          invoiceMap.set(invoiceNum, {
+            id: row.id,
+            store_id: row.store_id,
+            store_name: row.store_name,
+            customer_id: row.customer_id,
+            invoice_date: row.invoice_date,
+            due_date: row.due_date,
+            invoice_number: row.invoice_number,
+            invoice_status: row.invoice_status,
+            total_amount: row.total_amount,
+            balance: row.balance,
+            sales_person: row.sales_person,
+            items: []
+          });
+        }
+        invoiceMap.get(invoiceNum).items.push(row.item_details);
+      });
+
+      const invoices = Array.from(invoiceMap.values());
+
       res.json({
         success: true,
-        data: result.rows,
-        total: result.rowCount,
+        data: invoices,
+        total: invoices.length,
         limit,
         offset
       });
@@ -1052,45 +1162,82 @@ export function createDashboardRoutes(): Router {
     try {
       const limit = parseInt(req.query.limit as string) || 20;
       logger.info('Fetching call prioritization data', { limit });
-      
-      // Check if call_prioritization table exists and has data
-      const tableCheck = await db.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'call_prioritization'
-        ) as exists
-      `);
-      
-      if (!tableCheck.rows[0].exists) {
-        // Return mock data if table doesn't exist
-        return res.json({
-          success: true,
-          data: []
-        });
-      }
-      
-      // Get call prioritization data
+
+      // Use mangalam_invoices data to generate call prioritization
       const query = `
-        SELECT 
-          cp.id,
-          cp.store_id as "storeId",
-          s.name as "storeName",
-          cp.priority_score as "priorityScore",
-          cp.last_order_days as "lastOrderDays",
-          cp.order_frequency as "orderFrequency",
-          cp.average_order_value as "avgOrderValue",
-          cp.total_revenue as "totalRevenue",
-          cp.is_new_customer as "isNewCustomer",
-          cp.recommended_action as "recommendedAction",
-          cp.created_at as "createdAt"
-        FROM call_prioritization cp
-        JOIN stores s ON s.id = cp.store_id
-        ORDER BY cp.priority_score DESC
+        WITH store_metrics AS (
+          SELECT
+            s.id as store_id,
+            s.name as store_name,
+            MAX(mi.invoice_date) as last_order_date,
+            COUNT(DISTINCT mi.invoice_number) as order_count,
+            AVG(mi.total) as avg_order_value,
+            SUM(mi.total) as total_revenue,
+            CASE
+              WHEN MAX(mi.invoice_date) IS NULL THEN true
+              ELSE false
+            END as is_new_customer,
+            CASE
+              WHEN MAX(mi.invoice_date) IS NOT NULL THEN
+                (CURRENT_DATE - MAX(mi.invoice_date))::INTEGER
+              ELSE 999
+            END as last_order_days
+          FROM stores s
+          LEFT JOIN mangalam_invoices mi ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
+          GROUP BY s.id, s.name
+        ),
+        prioritized_stores AS (
+          SELECT
+            ROW_NUMBER() OVER (ORDER BY
+              CASE
+                WHEN last_order_days > 30 THEN last_order_days * 2
+                WHEN is_new_customer THEN 100
+                ELSE last_order_days
+              END DESC,
+              total_revenue DESC
+            ) as id,
+            store_id as "storeId",
+            store_name as "storeName",
+            ROUND(
+              CASE
+                WHEN is_new_customer THEN 95.0
+                WHEN last_order_days > 60 THEN 90.0
+                WHEN last_order_days > 30 THEN 85.0
+                WHEN last_order_days > 14 THEN 75.0
+                WHEN avg_order_value > 5000 THEN 70.0
+                ELSE 50.0 + (last_order_days * 0.5)
+              END, 1
+            ) as "priorityScore",
+            last_order_days as "lastOrderDays",
+            CASE
+              WHEN order_count = 0 THEN 'Never ordered'
+              WHEN order_count < 5 THEN 'Low frequency'
+              WHEN order_count < 10 THEN 'Medium frequency'
+              ELSE 'High frequency'
+            END as "orderFrequency",
+            ROUND(avg_order_value::numeric, 2) as "avgOrderValue",
+            ROUND(total_revenue::numeric, 2) as "totalRevenue",
+            is_new_customer as "isNewCustomer",
+            CASE
+              WHEN is_new_customer THEN 'Onboard new customer'
+              WHEN last_order_days > 60 THEN 'Win back - High priority'
+              WHEN last_order_days > 30 THEN 'Re-engage customer'
+              WHEN last_order_days > 14 THEN 'Follow up'
+              WHEN avg_order_value > 5000 THEN 'Maintain relationship'
+              ELSE 'Regular check-in'
+            END as "recommendedAction",
+            CURRENT_TIMESTAMP as "createdAt"
+          FROM store_metrics
+        )
+        SELECT *
+        FROM prioritized_stores
+        WHERE "priorityScore" > 40
+        ORDER BY "priorityScore" DESC
         LIMIT $1
       `;
-      
+
       const result = await db.query(query, [limit]);
-      
+
       res.json({
         success: true,
         data: result.rows

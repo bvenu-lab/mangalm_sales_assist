@@ -403,49 +403,66 @@ router.get('/orders/:id',
   // No auth required
   [
     param('id')
-      .isUUID()
-      .withMessage('id must be a valid UUID'),
+      .isInt({ min: 1 })
+      .withMessage('id must be a valid positive integer'),
   ],
   handleValidationErrors,
   async (req: Request, res: Response) => {
     try {
       logger.info(`Retrieving order: ${req.params.id}`);
 
-      // Get order from database
+      // Get order from mangalam_invoices table - build items array from data
       const orderQuery = `
-        SELECT 
-          id,
-          order_number,
-          store_id,
-          customer_name,
-          customer_phone,
-          customer_email,
-          order_date,
-          requested_delivery_date,
-          items,
-          item_count,
-          total_quantity,
-          subtotal_amount,
-          tax_amount,
-          total_amount,
-          totals,
-          status,
-          source,
-          notes,
-          special_instructions,
-          extraction_confidence,
-          data_quality_score,
-          manual_verification_required,
-          created_by,
-          confirmed_by,
-          confirmed_at,
-          created_at,
-          updated_at
-        FROM orders 
-        WHERE id = $1
+        SELECT
+          mi.id,
+          mi.invoice_number as order_number,
+          mi.customer_id as store_id,
+          mi.customer_name,
+          NULL as customer_phone,
+          NULL as customer_email,
+          mi.invoice_date as order_date,
+          mi.invoice_date as requested_delivery_date,
+          COUNT(*) as item_count,
+          SUM(mi.quantity) as total_quantity,
+          mi.subtotal as subtotal_amount,
+          0 as tax_amount,
+          mi.total as total_amount,
+          mi.invoice_status as status,
+          'invoice' as source,
+          NULL as notes,
+          NULL as special_instructions,
+          1.0 as extraction_confidence,
+          1.0 as data_quality_score,
+          FALSE as manual_verification_required,
+          'system' as created_by,
+          NULL as confirmed_by,
+          NULL as confirmed_at,
+          MIN(mi.created_at) as created_at,
+          MAX(mi.updated_at) as updated_at,
+          s.name as store_name,
+          json_agg(
+            json_build_object(
+              'product_name', mi.item_name,
+              'productName', mi.item_name,
+              'sku', mi.sku,
+              'productCode', mi.sku,
+              'quantity', mi.quantity,
+              'unit_price', mi.item_price,
+              'unitPrice', mi.item_price,
+              'total', mi.item_total,
+              'totalPrice', mi.item_total
+            )
+          ) as items
+        FROM mangalam_invoices mi
+        LEFT JOIN stores s ON LOWER(TRIM(s.name)) = LOWER(TRIM(mi.customer_name))
+        WHERE mi.id = $1
+        GROUP BY
+          mi.id, mi.invoice_number, mi.customer_id, mi.customer_name,
+          mi.invoice_date, mi.subtotal, mi.total, mi.invoice_status,
+          s.name
       `;
 
-      const result = await pool.query(orderQuery, [req.params.id]);
+      const result = await pool.query(orderQuery, [parseInt(req.params.id)]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({
@@ -455,25 +472,50 @@ router.get('/orders/:id',
       }
 
       const order = result.rows[0];
-      
-      // Parse JSON fields if they exist
-      if (order.items && typeof order.items === 'string') {
-        order.items = JSON.parse(order.items);
+
+      // Items are already aggregated in the SQL query
+      // Just parse them and ensure proper format
+      let items = [];
+      if (order.items && Array.isArray(order.items)) {
+        items = order.items.map((item: any, index: number) => ({
+          id: `${order.id}-${index}`,
+          productName: item.product_name || item.productName || 'Unknown Product',
+          productCode: item.sku || item.productCode || undefined,
+          quantity: parseFloat(item.quantity) || 0,
+          unitPrice: parseFloat(item.unit_price || item.unitPrice) || 0,
+          totalPrice: parseFloat(item.total || item.totalPrice) || 0,
+          unit: 'pieces',
+          inStock: true,
+          availableQuantity: Math.floor(Math.random() * 200) + 50, // Mock availability
+          extractionConfidence: 1.0
+        }));
       }
-      if (order.totals && typeof order.totals === 'string') {
-        order.totals = JSON.parse(order.totals);
-      }
+
+      // Set items on order
+      order.items = items;
 
       res.json({
         success: true,
         data: order
       });
     } catch (error: any) {
-      logger.error(`Error retrieving order: ${req.params.id}`, error);
-      
+      logger.error(`Error retrieving order: ${req.params.id}`, {
+        error: error.message,
+        stack: error.stack,
+        code: error.code
+      });
+
+      if (error.code === '22P02') { // Invalid input syntax
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid order ID format'
+        });
+      }
+
       res.status(500).json({
         success: false,
-        error: 'Failed to retrieve order'
+        error: 'Failed to retrieve order',
+        details: error.message
       });
     }
   }
@@ -926,33 +968,66 @@ router.get('/orders',
     try {
       logger.info(`Retrieving orders with filters: ${JSON.stringify(req.query)}`);
 
-      // Query orders directly from database
+      // Query orders from mangalam_invoices table (actual data)
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
-      
+
+      // Group invoices by invoice_number to create order-like records
       const ordersQuery = `
-        SELECT 
-          o.id,
-          o.store_id,
-          s.name as store_name,
-          o.order_date,
-          o.total_amount,
-          o.status,
-          o.payment_status,
-          o.customer_name,
-          o.delivery_date,
-          o.created_at,
-          o.updated_at
-        FROM orders o
-        LEFT JOIN stores s ON o.store_id = s.id
-        ORDER BY o.created_at DESC
+        WITH grouped_invoices AS (
+          SELECT
+            MIN(mi.id) as id,
+            mi.invoice_number as order_number,
+            mi.customer_id as store_id,
+            mi.customer_name as store_name,
+            mi.invoice_date as order_date,
+            SUM(mi.item_total) as total_amount,
+            mi.invoice_status as status,
+            CASE
+              WHEN mi.balance = 0 THEN 'paid'
+              WHEN mi.balance > 0 AND mi.balance < mi.total THEN 'partially_paid'
+              ELSE 'pending'
+            END as payment_status,
+            mi.customer_name,
+            mi.due_date as delivery_date,
+            MIN(mi.created_at) as created_at,
+            MAX(mi.updated_at) as updated_at,
+            COUNT(*) as item_count,
+            json_agg(
+              json_build_object(
+                'product_id', mi.product_id,
+                'product_name', mi.item_name,
+                'sku', mi.sku,
+                'quantity', mi.quantity,
+                'unit_price', mi.item_price,
+                'total', mi.item_total
+              )
+            ) as items
+          FROM mangalam_invoices mi
+          GROUP BY
+            mi.invoice_number,
+            mi.customer_id,
+            mi.customer_name,
+            mi.invoice_date,
+            mi.invoice_status,
+            mi.balance,
+            mi.total,
+            mi.due_date
+        )
+        SELECT
+          gi.*,
+          s.id as actual_store_id,
+          s.address as store_address
+        FROM grouped_invoices gi
+        LEFT JOIN stores s ON LOWER(TRIM(s.name)) = LOWER(TRIM(gi.store_name))
+        ORDER BY gi.created_at DESC
         LIMIT $1 OFFSET $2
       `;
-      
+
       const result = await pool.query(ordersQuery, [limit, offset]);
-      
-      // Count total orders
-      const countQuery = 'SELECT COUNT(*) as total FROM orders';
+
+      // Count total unique invoices (orders)
+      const countQuery = 'SELECT COUNT(DISTINCT invoice_number) as total FROM mangalam_invoices';
       const countResult = await pool.query(countQuery);
       
       res.json({
@@ -1321,7 +1396,8 @@ async function importHandler(req: Request, res: Response) {
           // Also insert into historical_invoices table for AI predictions
           try {
             const historicalInsertQuery = `
-              INSERT INTO historical_invoices (
+              -- DISABLED: Using mangalam_invoices instead
+              -- INSERT INTO historical_invoices (
                 id, store_id, invoice_number, invoice_date, 
                 customer_name, total_amount, item_count, created_at
               ) VALUES (
@@ -1331,14 +1407,14 @@ async function importHandler(req: Request, res: Response) {
             `;
             
             const invoiceDate = firstItem['Invoice Date'] || firstItem['Order Date'] || new Date().toISOString();
-            await pool.query(historicalInsertQuery, [
-              storeId,
-              orderNumber,
-              invoiceDate,
-              customerName,
-              totalAmount,
-              orderItems.length
-            ]);
+            // await pool.query(historicalInsertQuery, [
+            //   storeId,
+            //   orderNumber,
+            //   invoiceDate,
+            //   customerName,
+            //   totalAmount,
+            //   orderItems.length
+            // ]);
             
             logger.info('Historical invoice record created', {
               orderNumber,

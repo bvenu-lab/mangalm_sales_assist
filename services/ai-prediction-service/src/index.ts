@@ -8,9 +8,9 @@ import { logger, stream } from './utils/logger';
 import config from './config';
 // Import routes
 import healthRoutes from './routes/health-routes';
-// import predictionRoutes from './routes/prediction-routes';
+// import predictionRoutes from './routes/prediction-routes'; // Has compilation errors
 // import prioritizationRoutes from './routes/prioritization-routes';
-import authRoutes from './routes/auth-routes';
+// Auth routes removed - no authentication needed
 import mockDataRoutes from './routes/mock-data-routes';
 import callPrioritizationRoutes from './routes/call-prioritization-routes';
 // import vectorRoutes from './routes/vector-routes';
@@ -59,13 +59,13 @@ app.use(morgan('combined', { stream }));
 
 // API routes
 app.use('/health', healthRoutes);
-app.use('/api/auth', authRoutes);
+// No auth routes needed
 app.use('/api/call-prioritization', callPrioritizationRoutes);
 app.use('/mangalm/call-prioritization', callPrioritizationRoutes);
+// app.use('/api/predictions', predictionRoutes); // Disabled - real ML has compilation errors
 app.use('/api', mockDataRoutes); // Mock data routes for all /api/* endpoints
 app.use('/', mockDataRoutes); // Also mount at root for direct access from gateway
 app.use('/mangalm', mockDataRoutes); // Also mount at /mangalm for gateway routing
-// app.use('/api/predictions', predictionRoutes);
 // app.use('/api/prioritization', prioritizationRoutes);
 // app.use('/api/vector', vectorRoutes); // Vector database routes
 

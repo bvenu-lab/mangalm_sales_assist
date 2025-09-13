@@ -16,7 +16,6 @@ export interface ApiGatewayClientConfig {
  */
 export class ApiGatewayClient {
   private client: AxiosInstance;
-  private authToken: string | null = null;
 
   /**
    * Constructor
@@ -31,7 +30,7 @@ export class ApiGatewayClient {
       }
     });
 
-    // Add request interceptor for authentication
+    // Add request interceptor for logging
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         // Log request details
@@ -40,11 +39,6 @@ export class ApiGatewayClient {
           data: config.data,
           headers: config.headers
         });
-        
-        if (this.authToken) {
-          config.headers = config.headers || {};
-          config.headers['Authorization'] = `Bearer ${this.authToken}`;
-        }
         return config;
       },
       (error) => {
@@ -73,98 +67,15 @@ export class ApiGatewayClient {
           error: error.message
         });
         
-        // Handle authentication errors
+        // Log 401 errors (no auth required)
         if (error.response && error.response.status === 401) {
-          console.log('[Auth] 401 Unauthorized - Clearing auth token');
-          // Clear auth token but don't redirect if we're already on login page
-          this.clearAuthToken();
-          if (!window.location.pathname.includes('/login')) {
-            console.log('[Auth] Redirecting to login page');
-            window.location.href = '/login';
-          }
+          console.log('[API] 401 Unauthorized - Ignoring (no auth required)');
         }
         return Promise.reject(error);
       }
     );
   }
 
-  /**
-   * Set authentication token
-   */
-  public setAuthToken(token: string): void {
-    this.authToken = token;
-    localStorage.setItem('auth_token', token);
-  }
-
-  /**
-   * Get authentication token
-   */
-  public getAuthToken(): string | null {
-    return this.authToken;
-  }
-
-  /**
-   * Clear authentication token
-   */
-  public clearAuthToken(): void {
-    this.authToken = null;
-    localStorage.removeItem('auth_token');
-  }
-
-  /**
-   * Initialize client from local storage
-   */
-  public initFromLocalStorage(): void {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      this.authToken = token;
-    }
-  }
-
-  /**
-   * Clear all authentication data
-   */
-  public clearAllAuth(): void {
-    this.authToken = null;
-    localStorage.removeItem('auth_token');
-    // Clear any other auth-related data
-    localStorage.removeItem('user');
-  }
-
-  /**
-   * Login
-   */
-  public async login(username: string, password: string): Promise<any> {
-    console.log('[Auth] Attempting login for user:', username);
-    try {
-      const response = await this.client.post('/api/auth/login', { username, password });
-      if (response.data.token) {
-        console.log('[Auth] Login successful, token received');
-        this.setAuthToken(response.data.token);
-      }
-      return response.data;
-    } catch (error) {
-      console.error('[Auth] Login failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Logout
-   */
-  public async logout(): Promise<void> {
-    console.log('[Auth] Attempting logout');
-    try {
-      await this.client.post('/api/auth/logout');
-      console.log('[Auth] Logout successful');
-      this.clearAuthToken();
-    } catch (error) {
-      console.error('[Auth] Logout error:', error);
-      // Clear token anyway
-      this.clearAuthToken();
-      throw error;
-    }
-  }
 
   /**
    * Get stores
@@ -622,8 +533,5 @@ const apiGatewayClient = new ApiGatewayClient({
   baseURL: process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007',
   timeout: 30000
 });
-
-// Initialize from local storage
-apiGatewayClient.initFromLocalStorage();
 
 export default apiGatewayClient;

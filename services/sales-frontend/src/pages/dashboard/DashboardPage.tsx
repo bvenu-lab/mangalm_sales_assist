@@ -33,20 +33,21 @@ import {
   CloudUpload as CloudUploadIcon,
   Scanner as ScannerIcon,
 } from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
 import apiGatewayClient from '../../services/api-gateway-client';
 import { format } from 'date-fns';
-import { 
-  CallPrioritization, 
-  Store, 
-  PredictedOrder, 
-  SalesAgentPerformance 
+import {
+  CallPrioritization,
+  Store,
+  PredictedOrder,
+  SalesAgentPerformance
 } from '../../types/models';
+import { formatCurrency } from '../../utils/formatting';
 import { SkeletonDashboard } from '../../components/loading/LoadingSkeleton';
 import EnterpriseLineChart from '../../components/charts/EnterpriseLineChart';
 import EnterpriseBarChart from '../../components/charts/EnterpriseBarChart';
 import DocumentUpload from '../../components/documents/DocumentUpload';
 import { documentApi } from '../../services/document-api';
+import FeedbackAssistant from '../../components/feedback/FeedbackAssistant';
 
 /**
  * DashboardPage component
@@ -55,7 +56,6 @@ import { documentApi } from '../../services/document-api';
  */
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<{
@@ -233,7 +233,7 @@ const DashboardPage: React.FC = () => {
     },
     {
       label: 'Average Order Value',
-      value: `$${(performanceData?.averageOrderValue || 0).toFixed(2)}`,
+      value: formatCurrency(performanceData?.averageOrderValue || 0),
       icon: <ShoppingCartIcon />,
       trend: performanceData?.averageOrderValue && performanceData.averageOrderValue > 100 ? 'up' : 'down',
     },
@@ -245,7 +245,7 @@ const DashboardPage: React.FC = () => {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Welcome back, {user?.name}
+            Welcome back
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
             {format(new Date(), 'EEEE, MMMM d, yyyy')}
@@ -583,7 +583,7 @@ const DashboardPage: React.FC = () => {
                                 {order.customer_name || 'No customer name'}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {order.item_count} items • ₹{order.total_amount?.toLocaleString() || '0'}
+                                {order.item_count} items • {formatCurrency(order.total_amount || 0)}
                                 {order.source === 'document' && order.extraction_confidence && (
                                   <span> • Confidence: {(order.extraction_confidence * 100).toFixed(0)}%</span>
                                 )}
@@ -696,6 +696,12 @@ const DashboardPage: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Feedback Assistant - Always visible in lower left corner */}
+      <FeedbackAssistant
+        userEmail="user@mangalm.com"
+        userName="Sales Agent"
+      />
     </Container>
   );
 };

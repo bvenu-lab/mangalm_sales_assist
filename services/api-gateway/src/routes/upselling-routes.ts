@@ -177,9 +177,9 @@ export function createUpsellingRoutes(): Router {
             SUM(ii.quantity) as total_quantity,
             COUNT(DISTINCT hi.id) as order_count,
             MAX(hi.invoice_date) as last_ordered
-          FROM historical_invoices hi
-          JOIN invoice_items ii ON hi.invoice_number = ii.invoice_id
-          WHERE hi.store_id = $1::text
+          FROM mangalam_invoices hi
+          JOIN invoice_items ii ON hi.invoice_id = ii.invoice_id
+          WHERE hi.customer_id = $1::text
           GROUP BY ii.product_id
         ),
         product_growth AS (
@@ -192,9 +192,9 @@ export function createUpsellingRoutes(): Router {
               THEN 'growing'
               ELSE 'stable'
             END as trend
-          FROM historical_invoices hi
-          JOIN invoice_items ii ON hi.invoice_number = ii.invoice_id
-          WHERE hi.store_id = $1::text
+          FROM mangalam_invoices hi
+          JOIN invoice_items ii ON hi.invoice_id = ii.invoice_id
+          WHERE hi.customer_id = $1::text
           GROUP BY ii.product_id
         )
         SELECT 

@@ -38,8 +38,7 @@ export * from './tracing/distributed-tracing';
 // Rate Limiting
 export * from './rate-limiting/rate-limiter';
 
-// Authentication
-export * from './auth/jwt-auth';
+// Authentication - removed (no longer needed)
 
 // API Versioning
 export * from './api/versioning';

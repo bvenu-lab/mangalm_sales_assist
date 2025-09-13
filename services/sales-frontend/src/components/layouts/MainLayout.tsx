@@ -29,7 +29,6 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Assessment as AssessmentIcon,
   Person as PersonIcon,
-  Logout as LogoutIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Scanner as ScannerIcon,
@@ -37,7 +36,6 @@ import {
   TableChart as TableChartIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 
 // Define the drawer width
 const drawerWidth = 240;
@@ -54,7 +52,6 @@ const MainLayout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
 
   // Handle drawer toggle
   const handleDrawerToggle = () => {
@@ -79,11 +76,6 @@ const MainLayout: React.FC = () => {
     }
   };
 
-  // Handle logout
-  const handleLogout = async () => {
-    handleProfileMenuClose();
-    await logout();
-  };
 
   // Define the sidebar content
   const drawer = (
@@ -227,7 +219,7 @@ const MainLayout: React.FC = () => {
             aria-haspopup="true"
           >
             <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.name?.charAt(0) || 'U'}
+              {'U'}
             </Avatar>
           </IconButton>
           <Menu
@@ -261,12 +253,6 @@ const MainLayout: React.FC = () => {
                 <SettingsIcon fontSize="small" />
               </ListItemIcon>
               Settings
-            </MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
-              Logout
             </MenuItem>
           </Menu>
         </Toolbar>

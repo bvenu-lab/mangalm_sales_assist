@@ -107,11 +107,7 @@ class WebSocketService extends EventEmitter {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       
-      // Send auth token if available
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        this.send('auth', { token });
-      }
+      // No authentication needed
 
       // Process queued messages
       this.processMessageQueue();

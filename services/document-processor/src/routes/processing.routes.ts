@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+// Authentication removed - no auth middleware needed
 import { validateRequest } from '../middleware/validation.middleware';
 import { rateLimiter } from '../middleware/rate-limit.middleware';
 import { errorHandler } from '../middleware/error.middleware';
@@ -82,7 +82,7 @@ router.use(rateLimiter({
 // Get processing results for a document with enterprise error handling
 router.get(
   '/documents/:documentId/results',
-  authenticate,
+  // No auth required
   validateRequest(documentIdSchema, 'params'),
   async (req: Request, res: Response) => {
     try {
@@ -185,7 +185,7 @@ router.get(
 // Get all processing results for a store with enhanced filtering
 router.get(
   '/stores/:storeId/results',
-  authenticate,
+  // No auth required
   validateRequest(storeIdSchema, 'params'),
   validateRequest(paginationSchema, 'query'),
   async (req: Request, res: Response) => {
@@ -265,8 +265,8 @@ router.get(
 // Update manual corrections with proper validation and audit
 router.post(
   '/documents/:documentId/corrections',
-  authenticate,
-  authorize(['admin', 'store_manager', 'reviewer']),
+  // No auth required
+  // No auth required
   validateRequest(documentIdSchema, 'params'),
   validateRequest(correctionsSchema, 'body'),
   async (req: Request, res: Response) => {

@@ -79,7 +79,9 @@ const CallListPage: React.FC = () => {
       try {
         setLoading(true);
         const response = await api.callPrioritization.getAll();
-        const callsData = response.data?.data || [];
+        console.log('[CallListPage] API Response:', response);
+        const callsData = response?.data || [];
+        console.log('[CallListPage] Extracted calls data:', callsData);
         setCalls(callsData);
         setFilteredCalls(callsData);
         setLoading(false);

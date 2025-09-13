@@ -23,7 +23,6 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface UserProfile {
   id: string;
@@ -39,7 +38,6 @@ interface UserProfile {
 }
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
   
   // Profile state
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -73,37 +71,31 @@ const ProfilePage: React.FC = () => {
       try {
         setLoading(true);
         
-        // In a real app, this would be an API call
-        // For now, we'll use mock data based on the authenticated user
+        // Mock data - no authentication
         setTimeout(() => {
-          if (user) {
-            const mockProfile: UserProfile = {
-              id: user.id || '1',
-              username: user.username || 'salesagent1',
-              email: user.email || 'agent@mangalm.com',
-              fullName: user.name || 'John Doe',
-              role: user.role || 'Sales Agent',
-              department: 'Sales',
-              phoneNumber: '(555) 123-4567',
-              profileImage: undefined, // User doesn't have profileImage property
-              createdAt: '2025-01-15T08:00:00Z',
-              lastLogin: new Date().toISOString()
-            };
-            
-            setProfile(mockProfile);
-            setFormData({
-              fullName: mockProfile.fullName,
-              email: mockProfile.email,
-              phoneNumber: mockProfile.phoneNumber,
-              currentPassword: '',
-              newPassword: '',
-              confirmPassword: ''
-            });
-            setLoading(false);
-          } else {
-            setError('User not authenticated');
-            setLoading(false);
-          }
+          const mockProfile: UserProfile = {
+            id: '1',
+            username: 'salesagent1',
+            email: 'agent@mangalm.com',
+            fullName: 'John Doe',
+            role: 'Sales Agent',
+            department: 'Sales',
+            phoneNumber: '(555) 123-4567',
+            profileImage: undefined,
+            createdAt: '2025-01-15T08:00:00Z',
+            lastLogin: new Date().toISOString()
+          };
+          
+          setProfile(mockProfile);
+          setFormData({
+            fullName: mockProfile.fullName,
+            email: mockProfile.email,
+            phoneNumber: mockProfile.phoneNumber,
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+          setLoading(false);
         }, 800);
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -113,7 +105,7 @@ const ProfilePage: React.FC = () => {
     };
 
     fetchProfile();
-  }, [user]);
+  }, []);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

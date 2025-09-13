@@ -41,7 +41,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import api, { PaginatedResponse } from '../../services/api';
-import { PredictedOrder, Store } from '../../types/models';
+import { Order, Store } from '../../types/models';
+import { formatCurrency } from '../../utils/formatting';
 
 // Define filter state interface
 interface FilterState {
@@ -58,7 +59,7 @@ const OrderHistoryPage: React.FC = () => {
   const navigate = useNavigate();
   
   // State for orders data
-  const [orders, setOrders] = useState<PredictedOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalOrders, setTotalOrders] = useState(0);
@@ -74,7 +75,7 @@ const OrderHistoryPage: React.FC = () => {
     status: '',
     dateFrom: null,
     dateTo: null,
-    sortBy: 'predictionDate',
+    sortBy: 'order_date',
     sortOrder: 'desc'
   });
   
@@ -124,12 +125,14 @@ const OrderHistoryPage: React.FC = () => {
       };
       
       // Fetch orders
-      const response = await api.predictedOrder.getAll(params);
-      
-      if (response.data && response.data.data) {
-        // The API returns a PaginatedResponse in response.data
-        setOrders(response.data.data || []);
-        setTotalOrders(response.data.total || 0);
+      const response = await api.order.getAll(params);
+
+      if (response?.success === true) {
+        setOrders(response.data || []);
+        setTotalOrders(response.total || 0);
+      } else {
+        setOrders([]);
+        setTotalOrders(0);
       }
       
       setLoading(false);
@@ -197,7 +200,7 @@ const OrderHistoryPage: React.FC = () => {
       status: '',
       dateFrom: null,
       dateTo: null,
-      sortBy: 'predictionDate',
+      sortBy: 'order_date',
       sortOrder: 'desc'
     });
     setPage(0);
@@ -245,15 +248,17 @@ const OrderHistoryPage: React.FC = () => {
   
   // Get status chip color
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Predicted':
-        return 'info';
-      case 'Confirmed':
-        return 'primary';
-      case 'Completed':
+    switch (status?.toLowerCase()) {
+      case 'paid':
+      case 'completed':
         return 'success';
-      case 'Cancelled':
+      case 'pending':
+        return 'warning';
+      case 'cancelled':
+      case 'failed':
         return 'error';
+      case 'draft':
+        return 'info';
       default:
         return 'default';
     }
@@ -367,10 +372,10 @@ const OrderHistoryPage: React.FC = () => {
                     label="Status"
                   >
                     <MenuItem value="">All Statuses</MenuItem>
-                    <MenuItem value="Predicted">Predicted</MenuItem>
-                    <MenuItem value="Confirmed">Confirmed</MenuItem>
-                    <MenuItem value="Completed">Completed</MenuItem>
-                    <MenuItem value="Cancelled">Cancelled</MenuItem>
+                    <MenuItem value="paid">Paid</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="draft">Draft</MenuItem>
+                    <MenuItem value="cancelled">Cancelled</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -424,17 +429,17 @@ const OrderHistoryPage: React.FC = () => {
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('storeId')}>
+                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('store_id')}>
                     Store
-                    {filters.sortBy === 'storeId' && (
+                    {filters.sortBy === 'store_id' && (
                       <SortIcon sx={{ ml: 0.5, fontSize: 18, transform: filters.sortOrder === 'desc' ? 'rotate(180deg)' : 'none' }} />
                     )}
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('predictionDate')}>
+                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('order_date')}>
                     Order Date
-                    {filters.sortBy === 'predictionDate' && (
+                    {filters.sortBy === 'order_date' && (
                       <SortIcon sx={{ ml: 0.5, fontSize: 18, transform: filters.sortOrder === 'desc' ? 'rotate(180deg)' : 'none' }} />
                     )}
                   </Box>
@@ -456,9 +461,9 @@ const OrderHistoryPage: React.FC = () => {
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('totalAmount')}>
+                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('total_amount')}>
                     Total
-                    {filters.sortBy === 'totalAmount' && (
+                    {filters.sortBy === 'total_amount' && (
                       <SortIcon sx={{ ml: 0.5, fontSize: 18, transform: filters.sortOrder === 'desc' ? 'rotate(180deg)' : 'none' }} />
                     )}
                   </Box>
@@ -483,24 +488,29 @@ const OrderHistoryPage: React.FC = () => {
                 </TableRow>
               ) : (
                 orders.map(order => (
-                  <TableRow key={order.id} hover>
+                  <TableRow
+                    key={order.id}
+                    hover
+                    onClick={() => handleViewOrder(String(order.id))}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
-                        {order.id.substring(0, 8)}...
+                        {String(order.id).substring(0, 8)}...
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center">
                         <StoreIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
                         <Typography variant="body2">
-                          {order.store?.name || 'Unknown Store'}
+                          {order.store_name || order.store?.name || 'Unknown Store'}
                         </Typography>
                         <IconButton 
                           size="small" 
                           sx={{ ml: 1 }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewStore(order.storeId);
+                            handleViewStore(order.store_id);
                           }}
                         >
                           <VisibilityIcon fontSize="small" />
@@ -511,7 +521,7 @@ const OrderHistoryPage: React.FC = () => {
                       <Box display="flex" alignItems="center">
                         <CalendarIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {formatDate(order.predictionDate)}
+                          {formatDate(order.order_date)}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -519,7 +529,7 @@ const OrderHistoryPage: React.FC = () => {
                       <Box display="flex" alignItems="center">
                         <ShippingIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}
+                          Not set
                         </Typography>
                       </Box>
                     </TableCell>
@@ -532,7 +542,7 @@ const OrderHistoryPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
-                        ${order.totalAmount?.toFixed(2) || '0.00'}
+                        {formatCurrency(parseFloat(order.total_amount || '0'))}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">

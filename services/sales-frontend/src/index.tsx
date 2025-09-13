@@ -8,9 +8,9 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/animations.css';
 
-import SimplifiedApp from './SimplifiedApp';
+import NoAuthApp from './NoAuthApp';
 import theme from './styles/theme';
-// Removed AuthProvider - using simplified auth service instead
+// Complete rewrite - removed all broken auth code
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -27,13 +27,13 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-// Simplified app without AuthContext
+// Complete rewrite with simple auth
 root.render(
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <SimplifiedApp />
+        <NoAuthApp />
         <ToastContainer
           position="top-right"
           autoClose={5000}

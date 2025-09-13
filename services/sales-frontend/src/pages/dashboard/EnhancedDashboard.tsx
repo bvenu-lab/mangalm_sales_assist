@@ -36,6 +36,12 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  ToggleButton,
+  ToggleButtonGroup,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from '@mui/material';
 import {
   Store as StoreIcon,
@@ -97,13 +103,33 @@ import {
   Funnel,
   LabelList,
 } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
 import apiGatewayClient from '../../services/api-gateway-client';
 import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 import DocumentUpload from '../../components/documents/DocumentUpload';
 import { documentApi } from '../../services/document-api';
+import { formatCurrency } from '../../utils/formatting';
+import FeedbackAssistant from '../../components/feedback/FeedbackAssistant';
 
-// Product color palette for consistent visualization
+// Enhanced color palette for better pie chart visualization
+const PIE_CHART_COLORS = [
+  '#FF6B6B', // Red
+  '#4ECDC4', // Teal
+  '#45B7D1', // Blue
+  '#96CEB4', // Green
+  '#FFEAA7', // Yellow
+  '#DDA0DD', // Purple
+  '#98D8C8', // Mint
+  '#F7DC6F', // Gold
+  '#F8B739', // Orange
+  '#FF8C42', // Coral
+  '#95A5A6', // Gray
+  '#FD79A8', // Pink
+  '#74B9FF', // Light Blue
+  '#A29BFE', // Lavender
+  '#55EFC4', // Aqua
+];
+
+// Product-specific colors for consistency
 const PRODUCT_COLORS = {
   'BHEL PURI': '#FF6B6B',
   'SEV PURI': '#4ECDC4',
@@ -115,14 +141,29 @@ const PRODUCT_COLORS = {
   'KHAMAN': '#F7DC6F',
   'FAFDA': '#F8B739',
   'JALEBI': '#FF8C42',
+  'TASTY': '#FD79A8',
+  'BOONDI': '#74B9FF',
+  'KHATTA': '#A29BFE',
+  'BUTTER': '#55EFC4',
   'Default': '#95A5A6',
 };
 
-const getProductColor = (productName: string): string => {
-  const key = Object.keys(PRODUCT_COLORS).find(k => 
+const getProductColor = (productName: string, index?: number): string => {
+  // First try to match specific product names
+  const key = Object.keys(PRODUCT_COLORS).find(k =>
     productName.toUpperCase().includes(k)
   );
-  return PRODUCT_COLORS[key as keyof typeof PRODUCT_COLORS] || PRODUCT_COLORS.Default;
+
+  if (key) {
+    return PRODUCT_COLORS[key as keyof typeof PRODUCT_COLORS];
+  }
+
+  // If no match and index provided, use color from palette
+  if (index !== undefined) {
+    return PIE_CHART_COLORS[index % PIE_CHART_COLORS.length];
+  }
+
+  return PRODUCT_COLORS.Default;
 };
 
 interface InsightCard {
@@ -142,15 +183,17 @@ interface InsightCard {
 const EnhancedDashboard: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('180d');  // Default to 180d to ensure data is visible
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
+  const [productFilter, setProductFilter] = useState<string>('top-products');  // Filter for product/store views
+  const [storeSegmentsData, setStoreSegmentsData] = useState<any>(null);  // Store segments data
+  const [pieChartMode, setPieChartMode] = useState<'percentage' | 'quantity' | 'revenue'>('percentage');  // Pie chart display mode
   
   const [dashboardData, setDashboardData] = useState<any>({
     callList: [],
@@ -168,6 +211,11 @@ const EnhancedDashboard: React.FC = () => {
   useEffect(() => {
     fetchEnhancedDashboardData();
   }, [selectedTimeRange]);
+  
+  // Fetch store segments when filter or time range changes
+  useEffect(() => {
+    fetchStoreSegments();
+  }, [productFilter, selectedTimeRange]);
 
   const fetchEnhancedDashboardData = async () => {
     try {
@@ -188,34 +236,58 @@ const EnhancedDashboard: React.FC = () => {
         apiGatewayClient.get('/api/stores'),
         apiGatewayClient.get('/api/orders/pending?limit=10'),
         apiGatewayClient.get('/api/performance/summary'),
-        apiGatewayClient.get(`/api/analytics/trends?range=${selectedTimeRange}`).catch(() => ({ data: null })),
-        apiGatewayClient.get('/api/analytics/product-distribution').catch(() => ({ data: null })),
-        apiGatewayClient.get('/api/orders/recent?limit=10').catch(() => ({ data: null })),
+        apiGatewayClient.get(`/api/analytics/trends?range=${selectedTimeRange}`),
+        apiGatewayClient.get(`/api/analytics/product-distribution?range=${selectedTimeRange}`),
+        apiGatewayClient.get('/api/orders/recent?limit=10'),
       ]);
 
-      // Extract data from Promise.allSettled results
-      const getData = (result: any) => {
+      // Extract data from Promise.allSettled results - allow some to fail
+      const getData = (result: any, name: string, optional: boolean = false) => {
+        console.log(`[getData] ${name} result:`, result);
+        if (result.status === 'rejected') {
+          console.error(`[getData] ${name} FAILED:`, result.reason);
+          if (!optional) {
+            throw new Error(`Failed to fetch ${name}: ${result.reason}`);
+          }
+          return null; // Return null for optional endpoints
+        }
         if (result.status === 'fulfilled' && result.value?.data) {
-          return result.value.data;
+          // Handle both { data: [...] } and { success: true, data: {...} } response formats
+          const responseData = result.value.data;
+          console.log(`[getData] ${name} response data:`, responseData);
+          // If the response has a success flag and nested data, return the whole response
+          if (responseData && typeof responseData === 'object' && 'success' in responseData) {
+            return responseData;
+          }
+          return responseData;
+        }
+        console.error(`[getData] ${name} has no data in response:`, result);
+        if (!optional) {
+          throw new Error(`No data in ${name} response`);
         }
         return null;
       };
 
-      const callListData = getData(callListRes);
-      const storesData = getData(storesRes);
-      const ordersData = getData(ordersRes);
-      const performanceData = getData(performanceRes);
-      const trendsData = getData(trendsRes);
-      const distributionData = getData(distributionRes);
-      const recentOrdersData = getData(recentOrdersRes);
+      // Mark some endpoints as optional so they don't break the whole dashboard
+      const callListData = getData(callListRes, 'callList', true); // Optional
+      const storesData = getData(storesRes, 'stores');
+      const ordersData = getData(ordersRes, 'orders', true); // Optional
+      const performanceData = getData(performanceRes, 'performance', true); // Optional
+      const trendsData = getData(trendsRes, 'trends');
+      const distributionData = getData(distributionRes, 'distribution');
+      const recentOrdersData = getData(recentOrdersRes, 'recentOrders', true); // Optional
 
-      // Process data for visualizations
+      console.log('[Dashboard] Distribution API response:', distributionData);
+
+      // Process data for visualizations - provide defaults for empty database
       const processedData = processDataForVisualization(
         storesData || [],
         ordersData || [],
-        trendsData,
-        distributionData
+        trendsData || { data: { daily: [] } },
+        distributionData || { data: { storeDistribution: [] } }
       );
+      
+      console.log('[Dashboard] Processed productByStore:', processedData.productByStore);
 
       // Generate insights
       const insights = generateInsights(processedData);
@@ -237,12 +309,12 @@ const EnhancedDashboard: React.FC = () => {
       console.log('[EnhancedDashboard] Recent orders:', recentOrders.length, 'orders found');
 
       setDashboardData({
-        callList: callListData || [],
-        recentStores: storesData?.slice(0, 5) || [],
-        pendingOrders: ordersData || [],
+        callList: callListData, // NO FALLBACK
+        recentStores: storesData ? storesData.slice(0, 5) : undefined, // NO FALLBACK
+        pendingOrders: ordersData, // NO FALLBACK
         recentOrders: recentOrders,
-        performance: performanceData || null,
-        allStores: storesData || [],
+        performance: performanceData, // NO FALLBACK
+        allStores: storesData, // NO FALLBACK
         ...processedData,
         insights,
         alerts,
@@ -287,65 +359,96 @@ const EnhancedDashboard: React.FC = () => {
   };
 
   const processDataForVisualization = (stores: any[], orders: any[], trends: any, distribution: any) => {
-    // Handle null or undefined data - NO MOCK DATA GENERATION
-    const validStores = stores || [];
-    const validOrders = orders || [];
+    // Allow empty data - database was just cleared
+    console.log('[processData] Input distribution:', distribution);
+    console.log('[processData] Input stores:', stores?.length || 0, 'stores');
+    console.log('[processData] Input orders:', orders?.length || 0, 'orders');
     
-    // Product distribution by store - ONLY from real order data
-    const productByStore = validStores.slice(0, 10).map(store => {
-      const storeOrders = validOrders.filter((o: any) => o.store_id === store.id);
-      const productCounts: Record<string, number> = {};
-      
-      // ONLY process real orders - no mock data
-      if (storeOrders.length > 0) {
-        storeOrders.forEach((order: any) => {
-          order.items?.forEach((item: any) => {
+    // Product distribution by store - Use the actual distribution data from API
+    let productByStore: any[] = [];
+    let topProductsList: any[] = [];
+    
+    // First check if we have distribution data from the API
+    // Handle both nested structures: distribution.data.storeDistribution and distribution.storeDistribution
+    const storeDistribution = distribution?.data?.storeDistribution || distribution?.storeDistribution;
+    const topProductsData = distribution?.data?.topProducts || distribution?.topProducts;
+    
+    if (storeDistribution && Array.isArray(storeDistribution)) {
+      // Use the real distribution data from the API
+      console.log('[processData] Found storeDistribution, count:', storeDistribution.length);
+      productByStore = storeDistribution.map((store: any) => ({
+        storeName: store.store_name || 'Unknown Store',
+        total: parseInt(store.total_quantity) || 0,
+        revenue: parseFloat(store.total_revenue) || 0,
+        productCount: parseInt(store.product_count) || 0,
+      }));
+      console.log('[processData] Mapped productByStore:', productByStore);
+    } else {
+      console.log('[processData] No distribution data available (database may be empty)');
+      console.log('[processData] distribution structure:', distribution);
+      // Return empty array for charts to render empty state
+      productByStore = [];
+    }
+    
+    // Process top products from API
+    if (topProductsData && Array.isArray(topProductsData)) {
+      console.log('[processData] Found topProducts from API, count:', topProductsData.length);
+      topProductsList = topProductsData;
+    } else {
+      console.log('[processData] No top products data available');
+      topProductsList = [];
+    }
+
+    // Store performance trends - allow empty data
+    const storeTrends = trends?.data?.daily || trends?.daily || [];
+    console.log('[processData] Store trends:', storeTrends?.length || 0, 'records');
+    
+    // Use topProducts from API if available, otherwise try to extract from orders
+    let topProducts: Array<{ name: string; value: number; revenue?: number; fill: string }> = [];
+
+    // First, use the topProducts data from the API which has real data
+    if (topProductsList && topProductsList.length > 0) {
+      console.log('[processData] Using topProducts from API:', topProductsList.length);
+      topProducts = topProductsList.map((product: any, index: number) => ({
+        name: product.product_name || product.name,
+        value: parseFloat(product.total_quantity || product.quantity || 0),
+        revenue: parseFloat(product.total_revenue || 0),
+        fill: getProductColor(product.product_name || product.name, index)
+      })).slice(0, 10);
+    } else if (orders && orders.length > 0) {
+      // Fallback: try to extract from orders (though this usually won't have items)
+      console.log('[processData] Falling back to extracting from orders');
+      const allProducts: Record<string, number> = {};
+
+      orders.forEach((order: any) => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item: any) => {
             const productKey = item.product_name || item.productName;
             if (productKey) {
-              productCounts[productKey] = (productCounts[productKey] || 0) + (parseFloat(item.quantity) || 0);
+              const quantity = parseFloat(item.quantity);
+              if (!isNaN(quantity)) {
+                allProducts[productKey] = (allProducts[productKey] || 0) + quantity;
+              }
             }
           });
-        });
-      }
+        }
+      });
 
-      const total = Object.values(productCounts).reduce((a, b) => a + b, 0);
-      
-      // Only return stores with actual order data
-      return total > 0 ? {
-        storeName: store.name,
-        total,
-        ...productCounts,
-      } : null;
-    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).sort((a, b) => b.total - a.total);
+      // Convert to chart format - ONLY real products
+      topProducts = Object.entries(allProducts)
+        .map(([name, value]) => ({ name, value, fill: getProductColor(name) }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+    }
 
-    // Store performance trends - handle trends data properly (real data only)
-    const storeTrends = trends?.data?.daily || trends?.daily || [];
-    
-    // Top products across all stores - ONLY from real order data
-    const allProducts: Record<string, number> = {};
-    
-    validOrders.forEach((order: any) => {
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
-          const productKey = item.product_name || item.productName;
-          if (productKey) {
-            allProducts[productKey] = (allProducts[productKey] || 0) + (parseFloat(item.quantity) || 0);
-          }
-        });
-      }
-    });
-
-    // Convert to chart format - ONLY real products
-    const topProducts = Object.entries(allProducts)
-      .map(([name, value]) => ({ name, value, fill: getProductColor(name) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
+    console.log('[processData] Final topProducts for pie chart:', topProducts);
 
     return {
       productByStore,
       storeTrends,
       topProducts,
-      distribution: distribution?.data || distribution || {},
+      topProductsList, // Add top products from API
+      distribution: distribution, // NO FALLBACK
     };
   };
 
@@ -456,9 +559,26 @@ const EnhancedDashboard: React.FC = () => {
     return alerts;
   };
 
+  const fetchStoreSegments = async () => {
+    try {
+      const segment = productFilter === 'inactive-stores' ? 'inactive' :
+                     productFilter === 'low-activity' ? 'low-activity' :
+                     productFilter === 'high-performers' ? 'high-performers' : 'all';
+
+      const response = await apiGatewayClient.get(`/api/analytics/store-segments-products?segment=${segment}&range=${selectedTimeRange}`);
+      console.log('[fetchStoreSegments] API response:', response);
+      // Extract the nested data.data property from response (the actual store data)
+      setStoreSegmentsData(response?.data?.data || response?.data || response);
+    } catch (error) {
+      console.error('Failed to fetch store segments:', error);
+      setStoreSegmentsData(null);
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchEnhancedDashboardData();
+    fetchStoreSegments();
   };
 
   if (loading && !refreshing) {
@@ -493,11 +613,35 @@ const EnhancedDashboard: React.FC = () => {
               Sales Command Center
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Welcome back, {user?.name || 'Sales Agent'} • {format(new Date(), 'EEEE, MMMM d')}
+              Welcome back, Sales Agent • {format(new Date(), 'EEEE, MMMM d')}
             </Typography>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+              <ToggleButtonGroup
+                value={selectedTimeRange}
+                exclusive
+                onChange={(event, newRange) => {
+                  if (newRange !== null) {
+                    setSelectedTimeRange(newRange);
+                  }
+                }}
+                size="small"
+                sx={{ mr: 2 }}
+              >
+                <ToggleButton value="7d" aria-label="7 days">
+                  7 Days
+                </ToggleButton>
+                <ToggleButton value="30d" aria-label="30 days">
+                  30 Days
+                </ToggleButton>
+                <ToggleButton value="90d" aria-label="90 days">
+                  90 Days
+                </ToggleButton>
+                <ToggleButton value="180d" aria-label="180 days">
+                  180 Days
+                </ToggleButton>
+              </ToggleButtonGroup>
               <Button
                 variant="contained"
                 size="large"
@@ -552,33 +696,31 @@ const EnhancedDashboard: React.FC = () => {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {[
           {
-            title: 'Today\'s Revenue',
-            value: dashboardData.performance?.totalRevenue ? 
-              `$${dashboardData.performance.totalRevenue.toFixed(2)}` : '$0.00',
-            change: 0,
+            title: dashboardData.performance?.mostRecentDate ? 
+              `${new Date(dashboardData.performance.mostRecentDate).toLocaleDateString()} Revenue` : 
+              'Latest Revenue',
+            value: dashboardData.performance?.mostRecentDateRevenue ?
+              formatCurrency(dashboardData.performance.mostRecentDateRevenue) : '$0.00',
             icon: <ShoppingCartIcon />,
             color: theme.palette.success.main,
           },
           {
             title: 'Orders Processed',
             value: dashboardData.performance?.ordersPlaced?.toString() || '0',
-            change: 0,
             icon: <DocumentIcon />,
             color: theme.palette.primary.main,
           },
           {
             title: 'Conversion Rate',
-            value: dashboardData.performance?.ordersPlaced > 0 ? 
+            value: dashboardData.performance?.ordersPlaced > 0 ?
               `${((dashboardData.performance.ordersPlaced / (dashboardData.performance.callsCompleted || 1)) * 100).toFixed(0)}%` : '0%',
-            change: 0,
             icon: <TrendingUpIcon />,
             color: theme.palette.warning.main,
           },
           {
             title: 'Avg Order Value',
-            value: dashboardData.performance?.averageOrderValue ? 
-              `$${dashboardData.performance.averageOrderValue.toFixed(2)}` : '$0.00',
-            change: 0,
+            value: dashboardData.performance?.averageOrderValue ?
+              formatCurrency(dashboardData.performance.averageOrderValue) : '$0.00',
             icon: <AssessmentIcon />,
             color: theme.palette.info.main,
           },
@@ -600,19 +742,6 @@ const EnhancedDashboard: React.FC = () => {
                     <Typography variant="h4" fontWeight="bold">
                       {metric.value}
                     </Typography>
-                    <Box display="flex" alignItems="center" mt={1}>
-                      {metric.change > 0 ? (
-                        <ArrowUpwardIcon fontSize="small" color="success" />
-                      ) : (
-                        <ArrowDownwardIcon fontSize="small" color="error" />
-                      )}
-                      <Typography
-                        variant="body2"
-                        color={metric.change > 0 ? 'success.main' : 'error.main'}
-                      >
-                        {Math.abs(metric.change)}%
-                      </Typography>
-                    </Box>
                   </Box>
                   <Avatar sx={{ bgcolor: metric.color, width: 56, height: 56 }}>
                     {metric.icon}
@@ -859,7 +988,7 @@ const EnhancedDashboard: React.FC = () => {
                               </Typography>
                               <br />
                               <Typography component="span" variant="body2" color="text.secondary">
-                                ${(parseFloat(order.total_amount || order.totalAmount || '0')).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatCurrency(parseFloat(order.total_amount || order.totalAmount || '0'))}
                                 {' • '}
                                 {order.customer_name || order.customerName || 'No customer'}
                               </Typography>
@@ -892,42 +1021,424 @@ const EnhancedDashboard: React.FC = () => {
 
       {/* Main Visualizations */}
       <Grid container spacing={3}>
-        {/* Product Distribution by Store */}
+        {/* Top Products & Store Activity */}
         <Grid item xs={12} lg={8}>
           <Card>
             <CardHeader
-              title="Product Distribution by Store"
-              subheader="Quantity ordered per store with product breakdown"
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="h6">
+                    Store Product Distribution
+                  </Typography>
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <Select
+                      value={productFilter}
+                      onChange={(e: SelectChangeEvent) => setProductFilter(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="top-products">Top Products</MenuItem>
+                      <MenuItem value="inactive-stores">Inactive Stores (30+ days)</MenuItem>
+                      <MenuItem value="low-activity">Low Activity Stores</MenuItem>
+                      <MenuItem value="high-performers">High Performing Stores</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              }
+              subheader={
+                productFilter === 'top-products' ? 'Most frequently purchased products' :
+                productFilter === 'inactive-stores' ? 'Stores that haven\'t ordered in 30+ days' :
+                productFilter === 'low-activity' ? 'Stores with minimal product variety' : 
+                'Top stores by product count and revenue'
+              }
               action={
-                <IconButton onClick={() => navigate('/analytics')}>
-                  <VisibilityIcon />
-                </IconButton>
+                <Stack direction="row" spacing={1}>
+                  {['7d', '30d', '90d', '180d'].map(range => (
+                    <Chip
+                      key={range}
+                      label={range}
+                      onClick={() => setSelectedTimeRange(range)}
+                      color={selectedTimeRange === range ? 'primary' : 'default'}
+                      variant={selectedTimeRange === range ? 'filled' : 'outlined'}
+                      size="small"
+                    />
+                  ))}
+                  <IconButton onClick={() => navigate('/analytics')}>
+                    <VisibilityIcon />
+                  </IconButton>
+                </Stack>
               }
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={dashboardData.productByStore?.slice(0, 10)}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.1)} />
-                  <XAxis 
-                    dataKey="storeName" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis />
-                  <ChartTooltip />
-                  <Legend />
-                  {dashboardData.topProducts?.slice(0, 8).map((product: any) => (
-                    <Bar
-                      key={product.name}
-                      dataKey={product.name}
-                      stackId="a"
-                      fill={getProductColor(product.name)}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
+              {productFilter === 'top-products' && storeSegmentsData?.stores && storeSegmentsData.stores.length > 0 ? (
+                <>
+                  <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
+                    Stores showing top products distribution
+                  </Typography>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart
+                      data={(() => {
+                        // Transform data to show stores with their top products
+                        const stores = storeSegmentsData.stores.slice(0, 10);
+                        const topProducts = new Map<string, { name: string, color: string }>();
+
+                        // Get top 5 most common products across all stores
+                        const productCounts = new Map<string, number>();
+                        stores.forEach((store: any) => {
+                          store.products?.forEach((product: any) => {
+                            const count = productCounts.get(product.product_name) || 0;
+                            productCounts.set(product.product_name, count + product.quantity);
+                          });
+                        });
+
+                        // Sort and get top 5 products
+                        const sortedProducts = Array.from(productCounts.entries())
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 5);
+
+                        const colors = [
+                          theme.palette.primary.main,
+                          theme.palette.secondary.main,
+                          theme.palette.success.main,
+                          theme.palette.warning.main,
+                          theme.palette.info.main
+                        ];
+
+                        sortedProducts.forEach(([name], index) => {
+                          topProducts.set(name, { name, color: colors[index] });
+                        });
+
+                        // Transform stores data for stacked bar chart
+                        return stores.map((store: any) => {
+                          const storeData: any = {
+                            store_name: store.store_name?.length > 20 ?
+                              store.store_name.substring(0, 20) + '...' : store.store_name,
+                            total_revenue: store.store_total_revenue
+                          };
+
+                          // Add top product quantities
+                          store.products?.forEach((product: any) => {
+                            if (topProducts.has(product.product_name)) {
+                              storeData[product.product_name] = product.quantity;
+                            }
+                          });
+
+                          return storeData;
+                        });
+                      })()}
+                      margin={{ top: 20, right: 30, left: 60, bottom: 160 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.1)} />
+                      <XAxis
+                        dataKey="store_name"
+                        angle={-45}
+                        textAnchor="end"
+                        interval={0}
+                        tick={{ fontSize: 10 }}
+                      />
+                      <YAxis />
+                      <ChartTooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length > 0) {
+                            const total = payload.reduce((sum, item) => sum + (item.value || 0), 0);
+                            return (
+                              <Box sx={{ bgcolor: 'background.paper', p: 1, border: 1, borderColor: 'divider' }}>
+                                <Typography variant="body2" fontWeight="bold">{label}</Typography>
+                                <Divider sx={{ my: 0.5 }} />
+                                {payload.map((item: any, index: number) => (
+                                  <Typography key={index} variant="caption" display="block" style={{ color: item.fill }}>
+                                    {item.name}: {item.value} units
+                                  </Typography>
+                                ))}
+                                <Divider sx={{ my: 0.5 }} />
+                                <Typography variant="caption" fontWeight="bold">
+                                  Total: {total} units
+                                </Typography>
+                              </Box>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      {(() => {
+                        // Get the actual data that was prepared above
+                        const chartData = (() => {
+                          const stores = storeSegmentsData.stores.slice(0, 10);
+                          const productCounts = new Map<string, number>();
+                          stores.forEach((store: any) => {
+                            store.products?.forEach((product: any) => {
+                              const count = productCounts.get(product.product_name) || 0;
+                              productCounts.set(product.product_name, count + product.quantity);
+                            });
+                          });
+                          const sortedProducts = Array.from(productCounts.entries())
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5);
+                          return stores.map((store: any) => {
+                            const storeData: any = {
+                              store_name: store.store_name?.length > 20 ?
+                                store.store_name.substring(0, 20) + '...' : store.store_name,
+                            };
+                            store.products?.forEach((product: any) => {
+                              if (sortedProducts.find(([name]) => name === product.product_name)) {
+                                storeData[product.product_name] = product.quantity;
+                              }
+                            });
+                            return storeData;
+                          });
+                        })();
+
+                        // Extract unique product keys from actual chart data
+                        const productKeys = new Set<string>();
+                        chartData.forEach((store: any) => {
+                          Object.keys(store).forEach(key => {
+                            if (key !== 'store_name' && key !== 'total_revenue') {
+                              productKeys.add(key);
+                            }
+                          });
+                        });
+
+                        const colors = [
+                          theme.palette.primary.main,
+                          theme.palette.secondary.main,
+                          theme.palette.success.main,
+                          theme.palette.warning.main,
+                          theme.palette.info.main
+                        ];
+
+                        // Only create Bar components for products that exist in the data
+                        return Array.from(productKeys).slice(0, 5).map((productName, index) => (
+                          <Bar
+                            key={productName}
+                            dataKey={productName}
+                            stackId="products"
+                            fill={colors[index]}
+                            name={productName.length > 30 ? productName.substring(0, 30) + '...' : productName}
+                          />
+                        ));
+                      })()}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              ) : productFilter !== 'top-products' && storeSegmentsData?.stores && storeSegmentsData.stores.length > 0 ? (
+                <>
+                  {(() => {
+                    // Prepare and validate data
+                    const chartData = (() => {
+                        // Transform the data to have stores with product breakdowns
+                        const stores = storeSegmentsData?.stores || [];
+
+                        // Filter out stores without products for low-activity view
+                        const validStores = stores.filter((store: any) =>
+                          store.products && store.products.length > 0
+                        );
+
+                        // If no valid stores, return empty array
+                        if (validStores.length === 0) {
+                          return [];
+                        }
+
+                        const allProducts = new Set<string>();
+
+                        // Collect all unique products
+                        validStores.forEach((store: any) => {
+                          store.products?.forEach((product: any) => {
+                            if (product.product_name && product.quantity != null) {
+                              allProducts.add(product.product_name);
+                            }
+                          });
+                        });
+
+                        // Transform stores data for stacked bar chart
+                        return validStores.slice(0, 10).map((store: any) => {
+                          const storeData: any = {
+                            store_name: store.store_name?.length > 20 ?
+                              store.store_name.substring(0, 20) + '...' : store.store_name,
+                            total_revenue: store.store_total_revenue || 0
+                          };
+
+                          // Add product quantities with validation
+                          store.products?.forEach((product: any) => {
+                            if (product.product_name && product.quantity != null) {
+                              storeData[product.product_name] = product.quantity;
+                            }
+                          });
+
+                          return storeData;
+                        });
+                      })();
+
+                    // Only render chart if we have valid data
+                    if (!chartData || chartData.length === 0) {
+                      return (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+                          <Typography color="textSecondary" variant="h6" gutterBottom>
+                            {productFilter === 'inactive-stores' ? 'No Inactive Stores Found' :
+                             productFilter === 'low-activity' ? 'No Low Activity Stores Found' :
+                             'No High Performing Stores Found'}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary" textAlign="center" sx={{ mb: 2 }}>
+                            {productFilter === 'inactive-stores' ? 'All stores have recent activity' :
+                             productFilter === 'low-activity' ? 'All stores have good product variety' :
+                             'Try adjusting the time range or upload more data'}
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setProductFilter('top-products')}
+                          >
+                            View Top Products
+                          </Button>
+                        </Box>
+                      );
+                    }
+
+                    return (
+                      <ResponsiveContainer width="100%" height={400}>
+                        <BarChart
+                          data={chartData}
+                          margin={{ top: 20, right: 30, left: 60, bottom: 160 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="store_name"
+                        angle={-45}
+                        textAnchor="end"
+                        interval={0}
+                        tick={{ fontSize: 10 }}
+                        height={80}
+                      />
+                      <YAxis
+                        label={{
+                          value: 'Product Quantity',
+                          angle: -90,
+                          position: 'insideLeft',
+                          style: { fontSize: 12 }
+                        }}
+                      />
+                      <ChartTooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length > 0) {
+                            const totalQuantity = payload.reduce((sum, entry) => sum + (entry.value || 0), 0);
+                            return (
+                              <Box sx={{ bgcolor: 'background.paper', p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                                <Typography variant="subtitle2" fontWeight="bold">{label}</Typography>
+                                <Divider sx={{ my: 0.5 }} />
+                                {payload.map((entry: any, index: number) => (
+                                  entry.value > 0 && (
+                                    <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mt: 0.5 }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Box sx={{ width: 10, height: 10, bgcolor: entry.color, mr: 1 }} />
+                                        <Typography variant="caption">{entry.name}:</Typography>
+                                      </Box>
+                                      <Typography variant="caption" fontWeight="medium">
+                                        {entry.value} units
+                                      </Typography>
+                                    </Box>
+                                  )
+                                ))}
+                                <Divider sx={{ my: 0.5 }} />
+                                <Typography variant="caption" fontWeight="bold">
+                                  Total: {totalQuantity} units
+                                </Typography>
+                              </Box>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        align="center"
+                        wrapperStyle={{
+                          fontSize: '12px',
+                          paddingTop: '20px',
+                          bottom: 0
+                        }}
+                      />
+                      {/* Dynamically create Bar components for each product */}
+                      {(() => {
+                        // Use the same chartData that was prepared above
+                        const validStores = chartData || [];
+
+                        // If no data, return empty array
+                        if (validStores.length === 0) {
+                          return null;
+                        }
+
+                        // Collect all product keys from the actual data
+                        const productKeys = new Set<string>();
+                        validStores.forEach((store: any) => {
+                          Object.keys(store).forEach(key => {
+                            // Exclude non-product keys
+                            if (key !== 'store_name' && key !== 'total_revenue') {
+                              productKeys.add(key);
+                            }
+                          });
+                        });
+
+                        // Convert to array and sort by some criteria
+                        const products = Array.from(productKeys);
+
+                        // Generate bars only for products that exist in the data
+                        const colors = [
+                          theme.palette.primary.main,
+                          theme.palette.secondary.main,
+                          theme.palette.success.main,
+                          theme.palette.warning.main,
+                          theme.palette.info.main,
+                          theme.palette.error.main,
+                        ];
+
+                        return products.slice(0, 7).map((productName, index) => (
+                          <Bar
+                            key={productName}
+                            dataKey={productName}
+                            stackId="products"
+                            fill={colors[index % colors.length]}
+                            name={productName.length > 30 ? productName.substring(0, 30) + '...' : productName}
+                          />
+                        ));
+                      })()}
+                    </BarChart>
+                  </ResponsiveContainer>
+                    );
+                  })()}
+                </>
+              ) : productFilter !== 'top-products' && (!storeSegmentsData?.stores || storeSegmentsData.stores.length === 0) ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+                  <Typography color="textSecondary" variant="h6" gutterBottom>
+                    {productFilter === 'inactive-stores' ? 'No Inactive Stores Found' :
+                     productFilter === 'low-activity' ? 'No Low Activity Stores Found' :
+                     'No High Performing Stores Found'}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary" textAlign="center" sx={{ mb: 2 }}>
+                    {productFilter === 'inactive-stores' ? 'All stores have recent activity' :
+                     productFilter === 'low-activity' ? 'All stores have good product variety' :
+                     'Try adjusting the time range or upload more data'}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setProductFilter('top-products')}
+                  >
+                    View Top Products
+                  </Button>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+                  <Typography color="textSecondary" variant="h6">No Product Data Available</Typography>
+                  <Typography color="textSecondary" variant="body2" sx={{ mt: 1 }}>Upload orders to see product distribution</Typography>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<CloudUploadIcon />}
+                    sx={{ mt: 2 }}
+                    onClick={() => setShowUploadDialog(true)}
+                  >
+                    Upload Order
+                  </Button>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -938,8 +1449,42 @@ const EnhancedDashboard: React.FC = () => {
             <CardHeader
               title="Top Products"
               subheader="Best selling products across all stores"
+              action={
+                <ToggleButtonGroup
+                  value={pieChartMode}
+                  exclusive
+                  onChange={(event, newMode) => {
+                    if (newMode !== null) {
+                      setPieChartMode(newMode);
+                    }
+                  }}
+                  size="small"
+                  aria-label="pie chart display mode"
+                >
+                  <ToggleButton value="percentage" aria-label="percentage">
+                    <Tooltip title="Show Percentage">
+                      <span>%</span>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="quantity" aria-label="quantity">
+                    <Tooltip title="Show Quantity">
+                      <span>#</span>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="revenue" aria-label="revenue">
+                    <Tooltip title="Show Revenue">
+                      <span>$</span>
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              }
             />
             <CardContent>
+              {(() => {
+                console.log('[PieChart] dashboardData.topProducts:', dashboardData.topProducts);
+                console.log('[PieChart] Display mode:', pieChartMode);
+                return null;
+              })()}
               {dashboardData.topProducts && dashboardData.topProducts.length > 0 ? (
                 <ResponsiveContainer width="100%" height={400}>
                   <PieChart>
@@ -949,22 +1494,54 @@ const EnhancedDashboard: React.FC = () => {
                       cy="50%"
                       outerRadius={120}
                       fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      dataKey={pieChartMode === 'revenue' ? 'revenue' : 'value'}
+                      label={({ name, percent, value, payload }) => {
+                        if (pieChartMode === 'percentage') {
+                          return `${name.length > 20 ? name.substring(0, 20) + '...' : name} ${((percent || 0) * 100).toFixed(0)}%`;
+                        } else if (pieChartMode === 'quantity') {
+                          return `${name.length > 20 ? name.substring(0, 20) + '...' : name} (${value})`;
+                        } else {
+                          // Revenue mode - convert INR to USD (assuming 1 USD = 83 INR)
+                          const revenue = payload.revenue || value;
+                          const revenueUSD = revenue / 83;
+                          return `${name.length > 20 ? name.substring(0, 20) + '...' : name} $${(revenueUSD / 1000).toFixed(1)}K`;
+                        }
+                      }}
+                      labelLine={false}
                     >
                       {dashboardData.topProducts?.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell key={`cell-${index}`} fill={entry.fill || PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <ChartTooltip />
+                    <ChartTooltip
+                      formatter={(value: number, name: string, props: any) => {
+                        if (pieChartMode === 'revenue') {
+                          // Convert INR to USD (1 USD = 83 INR)
+                          const valueUSD = value / 83;
+                          return [`$${valueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
+                        } else if (pieChartMode === 'quantity') {
+                          return [`${value} units`, name];
+                        } else {
+                          // For percentage mode, calculate the percent
+                          const total = dashboardData.topProducts.reduce((sum: number, p: any) => sum + p.value, 0);
+                          const percent = ((value / total) * 100).toFixed(1);
+                          return [`${percent}%`, name];
+                        }
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value: string) => value.length > 25 ? value.substring(0, 25) + '...' : value}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <Box 
-                  display="flex" 
-                  flexDirection="column" 
-                  alignItems="center" 
-                  justifyContent="center" 
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
                   height={400}
                   sx={{ color: 'text.secondary' }}
                 >
@@ -989,7 +1566,7 @@ const EnhancedDashboard: React.FC = () => {
               subheader="7-day revenue and order trends"
               action={
                 <Stack direction="row" spacing={1}>
-                  {['7d', '30d', '90d'].map(range => (
+                  {['7d', '30d', '90d', '180d'].map(range => (
                     <Chip
                       key={range}
                       label={range}
@@ -1026,12 +1603,6 @@ const EnhancedDashboard: React.FC = () => {
                       stroke={theme.palette.secondary.main}
                       strokeWidth={2}
                       name="Orders"
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="target"
-                      fill={alpha(theme.palette.success.main, 0.3)}
-                      name="Target"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -1316,6 +1887,12 @@ const EnhancedDashboard: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Feedback Assistant - Always visible in lower left corner */}
+      <FeedbackAssistant
+        userEmail="user@mangalm.com"
+        userName="Sales Agent"
+      />
     </Container>
   );
 };

@@ -106,7 +106,7 @@ const ImportOrdersPage: React.FC = () => {
 
       // Upload the file using axios directly for multipart/form-data
       const token = localStorage.getItem('auth_token');
-      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007';
+      const apiUrl = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3015';
       
       const response = await axios.post(`${apiUrl}/api/orders/import`, formData, {
         headers: {

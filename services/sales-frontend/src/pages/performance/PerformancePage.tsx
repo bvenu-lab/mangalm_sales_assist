@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatCurrency } from '../../utils/formatting';
 import {
   Box,
   Typography,
@@ -160,7 +161,7 @@ const PerformancePage: React.FC = () => {
                 <MoneyIcon color="primary" fontSize="large" />
               </Box>
               <Typography variant="h3" color="primary" gutterBottom>
-                ${totalSales.toLocaleString()}
+                {formatCurrency(totalSales)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {periodFilter === 'daily' ? 'Today' : 
@@ -181,7 +182,7 @@ const PerformancePage: React.FC = () => {
                 <BarChartIcon color="secondary" fontSize="large" />
               </Box>
               <Typography variant="h3" color="secondary" gutterBottom>
-                ${avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {formatCurrency(avgOrderValue)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Per order average
@@ -308,10 +309,10 @@ const PerformancePage: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        ${item.averageOrderValue.toFixed(2)}
+                        {formatCurrency(item.averageOrderValue)}
                       </TableCell>
                       <TableCell align="right">
-                        ${item.totalSalesValue.toLocaleString()}
+                        {formatCurrency(item.totalSalesValue)}
                       </TableCell>
                     </TableRow>
                   ))}

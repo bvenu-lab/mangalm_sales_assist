@@ -16,7 +16,7 @@ router.get('/orders/predicted', async (req: Request, res: Response) => {
     logger.info('Fetching predicted orders', { storeId, limit, offset });
     
     let query = `
-      SELECT 
+      SELECT
         po.id,
         po.store_id,
         json_build_object(
@@ -28,6 +28,12 @@ router.get('/orders/predicted', async (req: Request, res: Response) => {
         po.total_amount as estimated_value,
         po.status,
         po.ai_recommendation,
+        po.justification,
+        po.reasoning,
+        po.data_sources,
+        po.pattern_indicators,
+        po.notes,
+        po.prediction_model,
         COALESCE(
           (SELECT json_agg(
             json_build_object(
@@ -80,6 +86,96 @@ router.get('/orders/predicted', async (req: Request, res: Response) => {
 });
 
 /**
+ * Get a single predicted order by ID (UUID)
+ */
+router.get('/orders/predicted/:id', async (req: Request, res: Response) => {
+  try {
+    const orderId = req.params.id;
+
+    logger.info('Fetching predicted order by ID', { orderId });
+
+    const query = `
+      SELECT
+        po.id,
+        po.store_id,
+        json_build_object(
+          'id', s.id,
+          'name', s.name,
+          'address', s.address,
+          'city', s.city,
+          'phone', s.phone,
+          'email', s.email,
+          'contactPerson', s.contact_person
+        ) as store,
+        po.predicted_date as prediction_date,
+        po.confidence as confidence_score,
+        po.total_amount as estimated_value,
+        po.status,
+        po.priority,
+        po.ai_recommendation,
+        po.justification,
+        po.reasoning,
+        po.data_sources,
+        po.pattern_indicators,
+        po.notes,
+        po.prediction_model,
+        po.manual_verification_required,
+        po.created_at,
+        po.updated_at,
+        po.created_by,
+        po.modified_by,
+        COALESCE(
+          (SELECT json_agg(
+            json_build_object(
+              'id', poi.id,
+              'productId', poi.product_id,
+              'name', poi.product_name,
+              'quantity', poi.predicted_quantity,
+              'price', poi.unit_price,
+              'total', poi.predicted_quantity * poi.unit_price,
+              'confidence', poi.confidence
+            )
+          )
+          FROM predicted_order_items poi
+          WHERE poi.predicted_order_id = po.id
+          ), '[]'::json
+        ) as predicted_items,
+        (SELECT COUNT(*) FROM predicted_order_items WHERE predicted_order_id = po.id) as item_count,
+        (SELECT SUM(predicted_quantity) FROM predicted_order_items WHERE predicted_order_id = po.id) as total_quantity
+      FROM predicted_orders po
+      JOIN stores s ON po.store_id = s.id
+      WHERE po.id = $1
+    `;
+
+    const result = await db.query(query, [orderId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Predicted order not found'
+      });
+    }
+
+    // Return the complete predicted order data
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error: any) {
+    logger.error('Error fetching predicted order by ID', {
+      orderId: req.params.id,
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch predicted order',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Also handle the /pending endpoint with proper filtering
  */
 router.get('/orders/pending', async (req: Request, res: Response) => {
@@ -90,7 +186,7 @@ router.get('/orders/pending', async (req: Request, res: Response) => {
     logger.info('Fetching pending orders', { storeId, limit });
     
     let query = `
-      SELECT 
+      SELECT
         po.id,
         po.store_id,
         json_build_object(
@@ -101,6 +197,13 @@ router.get('/orders/pending', async (req: Request, res: Response) => {
         po.confidence as confidence_score,
         po.total_amount as estimated_value,
         po.status,
+        po.ai_recommendation,
+        po.justification,
+        po.reasoning,
+        po.data_sources,
+        po.pattern_indicators,
+        po.notes,
+        po.prediction_model,
         COALESCE(
           (SELECT json_agg(
             json_build_object(

@@ -1,8 +1,7 @@
 import axios, { AxiosProgressEvent } from 'axios';
-import { getAuthToken } from './api';
 
 const DOCUMENT_PROCESSOR_URL = process.env.REACT_APP_DOCUMENT_PROCESSOR_URL || 'http://localhost:3010';
-const API_GATEWAY_URL = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3007';
+const API_GATEWAY_URL = process.env.REACT_APP_API_GATEWAY_URL || 'http://localhost:3015';
 
 // ALWAYS use API Gateway since document processor is not running
 const BASE_URL = `${API_GATEWAY_URL}/api/documents`;
@@ -195,10 +194,7 @@ export interface ProcessingResult {
 
 class DocumentAPI {
   private getHeaders() {
-    const token = getAuthToken();
-    return {
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
+    return {}; // No auth needed
   }
 
   async uploadDocument(

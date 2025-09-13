@@ -7,7 +7,16 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from './auth';
+// Auth types removed
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    storeIds?: string[];
+  };
+}
 import { logger } from '../utils/logger';
 
 export interface AuditEntry {

@@ -802,7 +802,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             size="small"
                             inputProps={{ min: 0, step: 0.01 }}
                             InputProps={{
-                              startAdornment: <Typography variant="body2">₹</Typography>
+                              startAdornment: <Typography variant="body2">$</Typography>
                             }}
                           />
                         </TableCell>

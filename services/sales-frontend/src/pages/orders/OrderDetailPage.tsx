@@ -47,6 +47,7 @@ import {
 } from '@mui/icons-material';
 import apiGatewayClient from '../../services/api-gateway-client';
 import { format } from 'date-fns';
+import { formatCurrency } from '../../utils/formatting';
 
 interface OrderItem {
   id?: string;
@@ -95,6 +96,9 @@ const safeParseFloat = (value: any): number => {
   if (typeof value === 'string') return parseFloat(value) || 0;
   return 0;
 };
+
+// Use centralized currency formatting
+const formatUSD = formatCurrency;
 
 const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -468,7 +472,7 @@ const OrderDetailPage: React.FC = () => {
                     Total Amount
                   </Typography>
                   <Typography variant="h6" color="primary">
-                    ₹{safeParseFloat(displayOrder.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatUSD(safeParseFloat(displayOrder.total_amount))}
                   </Typography>
                 </Grid>
               </Grid>
@@ -628,16 +632,16 @@ const OrderDetailPage: React.FC = () => {
                                 size="small"
                                 sx={{ width: 100 }}
                                 InputProps={{
-                                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
+                                  startAdornment: <InputAdornment position="start">$</InputAdornment>
                                 }}
                               />
                             ) : (
-                              `₹${safeParseFloat(item.unitPrice).toFixed(2)}`
+                              formatUSD(safeParseFloat(item.unitPrice))
                             )}
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
-                              ₹{safeParseFloat(item.totalPrice).toFixed(2)}
+                              {formatUSD(safeParseFloat(item.totalPrice))}
                             </Typography>
                           </TableCell>
                           {displayOrder.source === 'document' && (
@@ -683,17 +687,17 @@ const OrderDetailPage: React.FC = () => {
                 <Box width={300}>
                   <Box display="flex" justifyContent="space-between" mb={1}>
                     <Typography>Subtotal:</Typography>
-                    <Typography>₹{safeParseFloat(displayOrder.subtotal_amount).toFixed(2)}</Typography>
+                    <Typography>{formatUSD(safeParseFloat(displayOrder.subtotal_amount))}</Typography>
                   </Box>
                   <Box display="flex" justifyContent="space-between" mb={1}>
                     <Typography>Tax (18%):</Typography>
-                    <Typography>₹{safeParseFloat(displayOrder.tax_amount).toFixed(2)}</Typography>
+                    <Typography>{formatUSD(safeParseFloat(displayOrder.tax_amount))}</Typography>
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Box display="flex" justifyContent="space-between">
                     <Typography variant="h6">Total:</Typography>
                     <Typography variant="h6" color="primary">
-                      ₹{safeParseFloat(displayOrder.total_amount).toFixed(2)}
+                      {formatUSD(safeParseFloat(displayOrder.total_amount))}
                     </Typography>
                   </Box>
                 </Box>

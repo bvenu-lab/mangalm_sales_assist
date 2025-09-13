@@ -1,6 +1,7 @@
 import express from 'express';
 import { logger } from '../utils/logger';
-// Use mock service for local testing
+// Use mock service for local testing (real ML has compilation errors)
+// TODO: Fix the existing sophisticated ML algorithms
 import { PredictionService } from '../services/prediction/mock-prediction-service';
 
 const router = express.Router();

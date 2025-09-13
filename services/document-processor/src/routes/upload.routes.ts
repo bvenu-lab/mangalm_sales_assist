@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { UploadController } from '../controllers/upload.controller';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+// Authentication removed - no auth middleware needed
 import { validateRequest } from '../middleware/validation.middleware';
 import { rateLimiter } from '../middleware/rate-limit.middleware';
 import { errorHandler } from '../middleware/error.middleware';
@@ -66,7 +66,7 @@ router.use(audit);
 // Upload single document with enterprise error handling
 router.post(
   '/upload',
-  authenticate,
+  // No auth required
   rateLimiter({ 
     max: configManager.config.security.rateLimits.upload.max, 
     windowMs: configManager.config.security.rateLimits.upload.windowMs 
@@ -85,7 +85,7 @@ router.post(
 // Upload multiple documents with enhanced validation
 router.post(
   '/upload/batch',
-  authenticate,
+  // No auth required
   rateLimiter({ 
     max: Math.floor(configManager.config.security.rateLimits.upload.max / 2), 
     windowMs: configManager.config.security.rateLimits.upload.windowMs 
@@ -107,7 +107,7 @@ router.post(
 // Get document status with detailed response
 router.get(
   '/documents/:documentId/status',
-  authenticate,
+  // No auth required
   validateRequest(documentIdSchema, 'params'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -121,7 +121,7 @@ router.get(
 // Get documents by store with pagination and filtering
 router.get(
   '/stores/:storeId/documents',
-  authenticate,
+  // No auth required
   validateRequest(storeIdSchema, 'params'),
   validateRequest(paginationSchema, 'query'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -136,8 +136,8 @@ router.get(
 // Delete document with proper authorization and audit
 router.delete(
   '/documents/:documentId',
-  authenticate,
-  authorize(['admin', 'store_manager']),
+  // No auth required
+  // No auth required
   validateRequest(documentIdSchema, 'params'),
   validateRequest(Joi.object({
     reason: Joi.string().min(10).max(500).required().messages({
@@ -159,7 +159,7 @@ router.delete(
 // Get upload statistics with time-based filtering
 router.get(
   '/stats',
-  authenticate,
+  // No auth required
   validateRequest(Joi.object({
     startDate: Joi.date().optional(),
     endDate: Joi.date().greater(Joi.ref('startDate')).optional(),
@@ -194,8 +194,8 @@ router.get(
 // Get processing metrics
 router.get(
   '/metrics',
-  authenticate,
-  authorize(['admin', 'analyst']),
+  // No auth required
+  // No auth required
   validateRequest(Joi.object({
     startDate: Joi.date().optional(),
     endDate: Joi.date().greater(Joi.ref('startDate')).optional(),
