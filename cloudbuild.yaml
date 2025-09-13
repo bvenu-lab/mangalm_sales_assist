@@ -21,10 +21,22 @@ steps:
       - 'secretmanager.googleapis.com'
       - '--project=$PROJECT_ID'
 
+  # Grant Secret Manager access to default compute service account
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'grant-secret-access'
+    waitFor: ['enable-apis']
+    entrypoint: 'gcloud'
+    args:
+      - 'projects'
+      - 'add-iam-policy-binding'
+      - '$PROJECT_ID'
+      - '--member=serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com'
+      - '--role=roles/secretmanager.secretAccessor'
+
   # Deploy API Gateway using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api-gateway'
-    waitFor: ['enable-apis']
+    waitFor: ['grant-secret-access']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
