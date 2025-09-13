@@ -42,17 +42,17 @@ export function createDashboardRoutes(): Router {
           GROUP BY s.id, s.name, s.address
         ),
         priority_scores AS (
-          SELECT 
+          SELECT
             *,
             -- Calculate priority score based on:
             -- 1. Days since last order (higher score for longer gaps)
             -- 2. Average order value (higher score for valuable customers)
             -- 3. Total orders (regular customers get priority)
-            CASE 
+            CASE
               WHEN last_order_date IS NULL THEN 10.0
               ELSE LEAST(10.0, EXTRACT(DAY FROM NOW() - last_order_date) / 7.0 * 5.0)
             END +
-            CASE 
+            CASE
               WHEN avg_order_value > 50000 THEN 3.0
               WHEN avg_order_value > 30000 THEN 2.0
               WHEN avg_order_value > 10000 THEN 1.0
@@ -72,21 +72,26 @@ export function createDashboardRoutes(): Router {
               ELSE 'Standard follow-up'
             END as priority_reason
           FROM store_orders
+        ),
+        ranked_stores AS (
+          SELECT *,
+            ROW_NUMBER() OVER (ORDER BY priority_score DESC) as priority_rank
+          FROM priority_scores
         )
         SELECT
-          ROW_NUMBER() OVER (ORDER BY ps.priority_score DESC) as id,
-          ps.id as "storeId",
+          rs.priority_rank as id,
+          rs.id as "storeId",
           json_build_object(
-            'id', ps.id,
-            'name', ps.name,
-            'address', COALESCE(ps.address, ''),
-            'city', COALESCE(ps.address, ''),
-            'region', COALESCE(ps.address, '')
+            'id', rs.id,
+            'name', rs.name,
+            'address', COALESCE(rs.address, ''),
+            'city', COALESCE(rs.address, ''),
+            'region', COALESCE(rs.address, '')
           ) as store,
-          ROW_NUMBER() OVER (ORDER BY ps.priority_score DESC) as "priorityScore",
-          ps.priority_reason as "priorityReason",
+          rs.priority_rank as "priorityScore",
+          rs.priority_reason as "priorityReason",
           CASE
-            WHEN ps.last_order_date IS NOT NULL THEN ps.last_order_date::text
+            WHEN rs.last_order_date IS NOT NULL THEN rs.last_order_date::text
             ELSE NULL
           END as "lastCallDate",
           (CURRENT_DATE + INTERVAL '3 days')::text as "nextCallDate",
@@ -94,8 +99,8 @@ export function createDashboardRoutes(): Router {
           'Pending' as status,
           NOW() as "createdAt",
           NOW() as "updatedAt"
-        FROM priority_scores ps
-        ORDER BY ps.priority_score DESC
+        FROM ranked_stores rs
+        ORDER BY rs.priority_rank
         LIMIT $1
       `;
       
