@@ -172,21 +172,8 @@ CREATE INDEX IF NOT EXISTS idx_predicted_orders_store_id ON predicted_orders(sto
 CREATE INDEX IF NOT EXISTS idx_predicted_orders_date ON predicted_orders(predicted_date);
 CREATE INDEX IF NOT EXISTS idx_call_prioritization_priority ON call_prioritization(priority_score DESC);
 
--- Insert default system configuration
-INSERT INTO system_config (key, value, description) VALUES
-    ('product_validation_mode', 'learning', 'Product validation mode: strict or learning'),
-    ('prediction_confidence_threshold', '0.70', 'Minimum confidence for predictions'),
-    ('upselling_enabled', 'true', 'Enable upselling recommendations')
-ON CONFLICT (key) DO NOTHING;
-
--- Insert sample stores
-INSERT INTO stores (id, name, address, phone, email, region) VALUES
-    ('4261931000000094375', 'India Sweet and Spices Portland', '1620 NW Bethany Ct, Beaverton, OR', '503-690-0499', 'contact@indiasweetspices.com', 'Portland'),
-    ('4261931000000095135', 'Raja Indian Cuisine', '123 Main St, Portland, OR', '503-555-0123', 'info@rajacuisine.com', 'Portland'),
-    ('4261931000000092001', 'Rangoli Sweets', '456 Oak Ave, Seattle, WA', '206-555-0456', 'orders@rangolisweets.com', 'Seattle'),
-    ('4261931000000117001', 'New Indian Supermarket', '789 Pine St, San Francisco, CA', '415-555-0789', 'contact@newindianmarket.com', 'Bay Area'),
-    ('4261931000000106125', 'Bazaar', '321 Elm St, Los Angeles, CA', '213-555-0321', 'info@bazaar.com', 'Los Angeles')
-ON CONFLICT (id) DO NOTHING;
+-- Schema initialization complete - no test data inserted
+-- To populate with test data, run separate test data scripts
 
 -- Grant permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;

@@ -1,11 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Check for --clean flag to start with clean database
-if "%1"=="--clean" (
-    call start-enterprise-clean.bat
-    exit /b
-)
+REM Check for --clean flag to clear database data
+set CLEAN_DB=false
+if "%1"=="--clean" set CLEAN_DB=true
+if "%2"=="--clean" set CLEAN_DB=true
 
 REM ============================================
 REM ENTERPRISE-GRADE SYSTEM STARTUP SCRIPT v3.0
@@ -35,9 +34,14 @@ echo.
 echo ========================================================
 echo     MANGALM ENTERPRISE SYSTEM STARTUP v3.0
 echo     Production-Ready Infrastructure
+if "%CLEAN_DB%"=="true" echo     CLEAN DATABASE MODE - ALL DATA WILL BE CLEARED
 echo ========================================================
 echo.
-echo [%DATE% %TIME%] Starting system initialization...
+if "%CLEAN_DB%"=="true" (
+    echo [%DATE% %TIME%] Starting system initialization with CLEAN database...
+) else (
+    echo [%DATE% %TIME%] Starting system initialization...
+)
 echo.
 
 REM ===== PHASE 1: PRE-FLIGHT CHECKS =====
@@ -162,21 +166,38 @@ echo   [OK] Redis ready after !COUNTER! seconds
 REM Initialize database schema
 echo [INIT] Database schema...
 ping -n 3 localhost >nul 2>&1
+
+REM Process all schema files (they contain only schema, no test data)
 for %%f in (database\init\*.sql) do (
     if exist "%%f" (
-        echo   Processing %%~nxf...
-        docker exec %POSTGRES_CONTAINER% psql -U mangalm -d mangalm_sales -f /docker-entrypoint-initdb.d/%%~nxf >"%LOG_DIR%\schema-%%~nxf.log" 2>&1
-        if !errorlevel! neq 0 (
-            REM Check if it's just "already exists" error
-            findstr /C:"already exists" "%LOG_DIR%\schema-%%~nxf.log" >nul
-            if !errorlevel! equ 0 (
-                echo     [INFO] Schema already exists
-            ) else (
-                echo     [WARN] Issue with %%~nxf - check logs
+        REM Skip clear-all-tables.sql in normal processing
+        if /I NOT "%%~nxf"=="clear-all-tables.sql" (
+            echo   Processing %%~nxf...
+            docker exec %POSTGRES_CONTAINER% psql -U mangalm -d mangalm_sales -f /docker-entrypoint-initdb.d/%%~nxf >"%LOG_DIR%\schema-%%~nxf.log" 2>&1
+            if !errorlevel! neq 0 (
+                REM Check if it's just "already exists" error
+                findstr /C:"already exists" "%LOG_DIR%\schema-%%~nxf.log" >nul
+                if !errorlevel! equ 0 (
+                    echo     [INFO] Schema already exists
+                ) else (
+                    echo     [WARN] Issue with %%~nxf - check logs
+                )
             )
         )
     )
 )
+
+REM Clear database if --clean flag is specified
+if "%CLEAN_DB%"=="true" (
+    echo   [CLEAR] Clearing all database data...
+    docker exec %POSTGRES_CONTAINER% psql -U mangalm -d mangalm_sales -f /docker-entrypoint-initdb.d/clear-all-tables.sql >"%LOG_DIR%\clear-tables.log" 2>&1
+    if !errorlevel! equ 0 (
+        echo     [OK] All tables cleared successfully - database is now empty
+    ) else (
+        echo     [WARN] Issue clearing tables - check clear-tables.log
+    )
+)
+
 echo   [OK] Database schema initialized
 
 echo.
@@ -315,6 +336,14 @@ echo ---------
 echo   View logs:       docker-compose logs -f
 echo   Stop all:        stop-enterprise.bat
 echo   Clean stop:      stop-enterprise.bat --clean
+echo.
+if "%CLEAN_DB%"=="true" (
+    echo Database Status: CLEAN - Schema initialized, all tables empty
+    echo To populate with test data, run: node populate-test-data.js
+) else (
+    echo Database Status: SCHEMA ONLY - Tables are empty, ready for data
+    echo To populate with test data, run: node populate-test-data.js
+)
 echo.
 echo The application will open in your browser in 20 seconds...
 echo (Frontend compilation may take up to 60 seconds)

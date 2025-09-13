@@ -395,6 +395,18 @@ const StoreDetailPage: React.FC = () => {
   
   // Fetch store data
   useEffect(() => {
+    console.log('[DEBUG] useEffect triggered with id:', id);
+    console.log('[DEBUG] Current state before reset:', {
+      predictedOrders: predictedOrders?.length || 'null/undefined',
+      recentOrders: recentOrders?.length || 'null/undefined',
+      historicalInvoices: historicalInvoices?.length || 'null/undefined',
+      chartData: chartData?.length || 'null/undefined',
+      productSalesData: productSalesData?.length || 'null/undefined'
+    });
+
+    // Set loading FIRST to prevent rendering with mixed state
+    setLoading(true);
+
     // Reset state when ID changes
     setStore(null);
     safePredictedOrdersSetter([]);
@@ -405,14 +417,14 @@ const StoreDetailPage: React.FC = () => {
     safeProductSalesDataSetter([]);
     setVisibleProducts(new Set());
     setError(null);
-    
+
+    console.log('[DEBUG] State reset completed, loading set to true');
+
     let mounted = true;
     const fetchStoreData = async () => {
       if (!id || !mounted) return;
-      
+
       try {
-        setLoading(true);
-        setError(null);
         console.log('[StoreDetailPage] Starting to fetch data for store:', id);
         
         // Fetch store details
@@ -527,12 +539,30 @@ const StoreDetailPage: React.FC = () => {
         console.log('[StoreDetailPage] Final store state:', storeResponse);
         
         // Determine best time window based on data range and process chart data
-        if (mappedInvoices.length > 0) {
-          const dates = (mappedInvoices || []).map((inv: any) => new Date(inv.invoiceDate));
-          const minDate = new Date(Math.min(...(dates || []).map(d => d.getTime())));
-          const maxDate = new Date(Math.max(...(dates || []).map(d => d.getTime())));
-          const daysDiff = (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24);
-          
+        if (mappedInvoices && mappedInvoices.length > 0) {
+          console.log('[DEBUG] Processing chart data, mappedInvoices:', mappedInvoices?.length, 'items');
+
+          let daysDiff = 30; // Default fallback
+
+          try {
+            const dates = (mappedInvoices || []).map((inv: any) => new Date(inv.invoiceDate));
+            console.log('[DEBUG] Created dates array:', dates?.length, 'dates');
+
+            if (!dates || dates.length === 0) {
+              console.error('[DEBUG] Dates array is null or empty!');
+              return;
+            }
+
+            const minDate = new Date(Math.min(...(dates || []).map(d => d.getTime())));
+            const maxDate = new Date(Math.max(...(dates || []).map(d => d.getTime())));
+            daysDiff = (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24);
+            console.log('[DEBUG] Date range calculated:', daysDiff, 'days');
+          } catch (error) {
+            console.error('[DEBUG] Error in chart data processing:', error);
+            console.error('[DEBUG] mappedInvoices at error:', mappedInvoices);
+            // Continue with default daysDiff value
+          }
+
           let defaultWindow: TimeWindow = 'month';
           if (daysDiff <= 35) {
             defaultWindow = 'week';
@@ -784,6 +814,38 @@ const StoreDetailPage: React.FC = () => {
         <CircularProgress />
       </Box>
     );
+  }
+
+  // DEBUGGING: Log all array states before render
+  console.log('[RENDER DEBUG] About to render with states:', {
+    predictedOrders: predictedOrders ? predictedOrders.length : 'NULL',
+    recentOrders: recentOrders ? recentOrders.length : 'NULL',
+    historicalInvoices: historicalInvoices ? historicalInvoices.length : 'NULL',
+    chartData: chartData ? chartData.length : 'NULL',
+    productSalesData: productSalesData ? productSalesData.length : 'NULL',
+    visibleProducts: visibleProducts ? visibleProducts.size : 'NULL'
+  });
+
+  // DEBUGGING: Check for null arrays that should be empty arrays
+  if (predictedOrders === null) {
+    console.error('[RENDER ERROR] predictedOrders is NULL!');
+    return <div>Error: predictedOrders is null</div>;
+  }
+  if (recentOrders === null) {
+    console.error('[RENDER ERROR] recentOrders is NULL!');
+    return <div>Error: recentOrders is null</div>;
+  }
+  if (historicalInvoices === null) {
+    console.error('[RENDER ERROR] historicalInvoices is NULL!');
+    return <div>Error: historicalInvoices is null</div>;
+  }
+  if (chartData === null) {
+    console.error('[RENDER ERROR] chartData is NULL!');
+    return <div>Error: chartData is null</div>;
+  }
+  if (productSalesData === null) {
+    console.error('[RENDER ERROR] productSalesData is NULL!');
+    return <div>Error: productSalesData is null</div>;
   }
   
   // Render error state

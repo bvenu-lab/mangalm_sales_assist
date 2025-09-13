@@ -74,19 +74,19 @@ export function createDashboardRoutes(): Router {
           FROM store_orders
         )
         SELECT
-          ROW_NUMBER() OVER (ORDER BY priority_score DESC) as id,
-          id as "storeId",
+          ROW_NUMBER() OVER (ORDER BY ps.priority_score DESC) as id,
+          ps.id as "storeId",
           json_build_object(
-            'id', id,
-            'name', name,
-            'address', COALESCE(address, ''),
-            'city', COALESCE(address, ''),
-            'region', COALESCE(address, '')
+            'id', ps.id,
+            'name', ps.name,
+            'address', COALESCE(ps.address, ''),
+            'city', COALESCE(ps.address, ''),
+            'region', COALESCE(ps.address, '')
           ) as store,
-          ROW_NUMBER() OVER (ORDER BY priority_score DESC) as "priorityScore",
-          priority_reason as "priorityReason",
+          ROW_NUMBER() OVER (ORDER BY ps.priority_score DESC) as "priorityScore",
+          ps.priority_reason as "priorityReason",
           CASE
-            WHEN last_order_date IS NOT NULL THEN last_order_date::text
+            WHEN ps.last_order_date IS NOT NULL THEN ps.last_order_date::text
             ELSE NULL
           END as "lastCallDate",
           (CURRENT_DATE + INTERVAL '3 days')::text as "nextCallDate",
@@ -94,8 +94,8 @@ export function createDashboardRoutes(): Router {
           'Pending' as status,
           NOW() as "createdAt",
           NOW() as "updatedAt"
-        FROM priority_scores
-        ORDER BY priority_score DESC
+        FROM priority_scores ps
+        ORDER BY ps.priority_score DESC
         LIMIT $1
       `;
       
