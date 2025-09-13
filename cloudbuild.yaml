@@ -29,6 +29,7 @@ steps:
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
        '--source', './services/api-gateway',
+       '--platform', 'managed',
        '--region', '${_REGION}',
        '--allow-unauthenticated',
        '--port', '3007',
@@ -38,6 +39,7 @@ steps:
        '--min-instances', '1',
        '--max-instances', '50',
        '--timeout', '300',
+       '--no-use-dockerfile',
        '--set-env-vars', 'NODE_ENV=production,PORT=3007,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
@@ -49,6 +51,7 @@ steps:
     args:
       ['run', 'deploy', 'mangalm-bulk-upload-api',
        '--source', './services/bulk-upload-api',
+       '--platform', 'managed',
        '--region', '${_REGION}',
        '--allow-unauthenticated',
        '--port', '3009',
@@ -58,6 +61,7 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '900',
+       '--no-use-dockerfile',
        '--set-env-vars', 'NODE_ENV=production,PORT=3009,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,REDIS_URL=redis://redis:6379',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
@@ -69,6 +73,7 @@ steps:
     args:
       ['run', 'deploy', 'mangalm-ai-prediction',
        '--source', './services/ai-prediction-service',
+       '--platform', 'managed',
        '--region', '${_REGION}',
        '--allow-unauthenticated',
        '--port', '3001',
@@ -78,6 +83,7 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '300',
+       '--no-use-dockerfile',
        '--set-env-vars', 'NODE_ENV=production,PORT=3001,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
@@ -89,6 +95,7 @@ steps:
     args:
       ['run', 'deploy', 'mangalm-document-processor',
        '--source', './services/document-processor',
+       '--platform', 'managed',
        '--region', '${_REGION}',
        '--allow-unauthenticated',
        '--port', '3008',
@@ -98,6 +105,7 @@ steps:
        '--min-instances', '0',
        '--max-instances', '10',
        '--timeout', '300',
+       '--no-use-dockerfile',
        '--set-env-vars', 'NODE_ENV=production,PORT=3008,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
        '--set-secrets', 'DB_PASSWORD=db-password:latest,OPENAI_API_KEY=openai-api-key:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
@@ -139,6 +147,7 @@ steps:
 
         gcloud run deploy mangalm-sales-frontend \
           --source=./services/sales-frontend \
+          --platform=managed \
           --region=${_REGION} \
           --allow-unauthenticated \
           --port=3000 \
@@ -148,6 +157,7 @@ steps:
           --min-instances=0 \
           --max-instances=10 \
           --timeout=300 \
+          --no-use-dockerfile \
           --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL"
 
   # Zoho Integration Service - DISABLED FOR NOW
