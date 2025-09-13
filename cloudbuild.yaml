@@ -19,6 +19,8 @@ steps:
       - 'sqladmin.googleapis.com'
       - 'run.googleapis.com'
       - 'secretmanager.googleapis.com'
+      - 'cloudresourcemanager.googleapis.com'
+      - 'iamcredentials.googleapis.com'
       - '--project=$PROJECT_ID'
 
   # Grant Secret Manager access to default compute service account
