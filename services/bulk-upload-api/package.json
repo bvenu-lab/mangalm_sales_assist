@@ -4,7 +4,8 @@
   "description": "Enterprise Bulk Upload API Server - The actual working server",
   "main": "server-enterprise-v2.js",
   "scripts": {
-    "start": "node server-cloud.js",
+    "start": "node minimal-server.js",
+    "start:cloud": "node minimal-server.js",
     "start:local": "node server-enterprise-v2.js",
     "dev": "nodemon server-enterprise-v2.js",
     "build": "echo 'Build successful - using working JavaScript files'",
