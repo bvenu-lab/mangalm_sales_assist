@@ -61,10 +61,11 @@ steps:
 
         echo "Secrets setup complete"
 
-  # Deploy API Gateway first (other services may depend on it)
+  # Deploy all backend services in parallel (they don't depend on each other for building)
+  # Deploy API Gateway
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api-gateway'
-    waitFor: ['setup-secrets']
+    waitFor: ['setup-secrets']  # Only wait for secrets to be ready
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
@@ -83,10 +84,10 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Deploy Bulk Upload API using buildpacks
+  # Deploy Bulk Upload API in parallel
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-bulk-upload-api'
-    waitFor: ['setup-secrets']
+    waitFor: ['setup-secrets']  # Only wait for secrets to be ready
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-bulk-upload-api',
@@ -105,10 +106,10 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Deploy AI Prediction Service using buildpacks
+  # Deploy AI Prediction Service in parallel
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-ai-prediction'
-    waitFor: ['setup-secrets']
+    waitFor: ['setup-secrets']  # Only wait for secrets to be ready
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-ai-prediction',
@@ -127,10 +128,10 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Deploy Document Processor (simplified version for Cloud Run)
+  # Deploy Document Processor in parallel
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-document-processor'
-    waitFor: ['setup-secrets']
+    waitFor: ['setup-secrets']  # Only wait for secrets to be ready
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-document-processor',

@@ -512,32 +512,55 @@ const StoreDetailPage: React.FC = () => {
         console.log('[StoreDetailPage] Setting historical invoices:', mappedInvoices, 'isArray:', Array.isArray(mappedInvoices));
         safeHistoricalInvoicesSetter(mappedInvoices);
         
-        // Fetch call prioritization for this store
+        // Fetch call prioritization for this store with unique rank
         console.log('[StoreDetailPage] Fetching call prioritization...');
-        const callResponse = await api.callPrioritization.getAll({ storeId: id });
-        console.log('[StoreDetailPage] Call prioritization response:', callResponse);
-        // Extract and find relevant call prioritization for this store
-        const callData = callResponse?.success ? callResponse.data : callResponse?.data || callResponse || [];
-        const totalStoreCount = callResponse?.totalStores || callResponse?.total || 100; // Default to 100 if not provided
-        setTotalStores(totalStoreCount);
+        try {
+          // Get specific store's priority with correct unique rank
+          const storePriorityResponse = await apiGatewayClient.get(`/api/calls/store-priority/${id}`);
+          console.log('[StoreDetailPage] Store priority response:', storePriorityResponse);
 
-        const storeCallData = Array.isArray(callData) ?
-          callData.find((c: any) => c.store_id === id || c.storeId === id) : null;
-        if (storeCallData) {
-          // Map snake_case to camelCase
-          const mappedCallData = {
-            id: storeCallData.id,
-            storeId: storeCallData.store_id || storeCallData.storeId,
-            priorityScore: storeCallData.priority_score || storeCallData.priorityScore || 5,
-            priorityReason: storeCallData.priority_reason || storeCallData.priorityReason || 'Regular follow-up',
-            lastCallDate: storeCallData.last_call_date || storeCallData.lastCallDate,
-            nextCallDate: storeCallData.next_call_date || storeCallData.scheduled_date || storeCallData.nextCallDate,
-            status: storeCallData.status || 'Pending',
-            createdAt: storeCallData.created_at || storeCallData.createdAt || new Date().toISOString(),
-            updatedAt: storeCallData.updated_at || storeCallData.updatedAt
-          };
-          setCallPrioritization(mappedCallData);
+          if (storePriorityResponse?.success && storePriorityResponse.data) {
+            const storeCallData = storePriorityResponse.data;
+            const mappedCallData = {
+              id: storeCallData.storeId,
+              storeId: storeCallData.storeId,
+              priorityScore: storeCallData.priorityScore || 5,
+              priorityReason: storeCallData.priorityReason || 'Regular follow-up',
+              lastCallDate: storeCallData.lastCallDate,
+              nextCallDate: storeCallData.nextCallDate,
+              status: storeCallData.status || 'Pending',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            setCallPrioritization(mappedCallData);
+          }
+        } catch (error) {
+          console.log('[StoreDetailPage] Error fetching store priority, falling back to list method:', error);
+          // Fallback to original method if new endpoint fails
+          const callResponse = await api.callPrioritization.getAll({ storeId: id });
+          const callData = callResponse?.success ? callResponse.data : callResponse?.data || callResponse || [];
+          const storeCallData = Array.isArray(callData) ?
+            callData.find((c: any) => c.store_id === id || c.storeId === id) : null;
+          if (storeCallData) {
+            const mappedCallData = {
+              id: storeCallData.id,
+              storeId: storeCallData.store_id || storeCallData.storeId,
+              priorityScore: storeCallData.priority_score || storeCallData.priorityScore || 5,
+              priorityReason: storeCallData.priority_reason || storeCallData.priorityReason || 'Regular follow-up',
+              lastCallDate: storeCallData.last_call_date || storeCallData.lastCallDate,
+              nextCallDate: storeCallData.next_call_date || storeCallData.scheduled_date || storeCallData.nextCallDate,
+              status: storeCallData.status || 'Pending',
+              createdAt: storeCallData.created_at || storeCallData.createdAt || new Date().toISOString(),
+              updatedAt: storeCallData.updated_at || storeCallData.updatedAt
+            };
+            setCallPrioritization(mappedCallData);
+          }
         }
+
+        // Get total stores count for percentage calculations
+        const callListResponse = await api.callPrioritization.getAll();
+        const totalStoreCount = callListResponse?.totalStores || callListResponse?.total || 100;
+        setTotalStores(totalStoreCount);
         
         console.log('[StoreDetailPage] All data fetched successfully');
         console.log('[StoreDetailPage] Final store state:', storeResponse);

@@ -135,6 +135,96 @@ export function createDashboardRoutes(): Router {
     }
   });
 
+  // Get specific store's priority with correct rank
+  router.get('/calls/store-priority/:storeId', async (req: Request, res: Response) => {
+    try {
+      const storeId = req.params.storeId;
+
+      // Get the full ranked list and find the specific store
+      const query = `
+        WITH store_orders AS (
+          SELECT
+            s.id,
+            s.name,
+            s.address,
+            COUNT(o.id) as total_orders,
+            MAX(o.order_date) as last_order_date,
+            AVG(o.total_amount) as avg_order_value,
+            SUM(o.total_amount) as total_revenue
+          FROM stores s
+          LEFT JOIN orders o ON s.id = o.store_id
+          GROUP BY s.id, s.name, s.address
+        ),
+        priority_scores AS (
+          SELECT
+            *,
+            CASE
+              WHEN last_order_date IS NULL THEN 10.0
+              ELSE LEAST(10.0, EXTRACT(DAY FROM NOW() - last_order_date) / 7.0 * 5.0)
+            END +
+            CASE
+              WHEN avg_order_value > 50000 THEN 3.0
+              WHEN avg_order_value > 30000 THEN 2.0
+              WHEN avg_order_value > 10000 THEN 1.0
+              ELSE 0.5
+            END +
+            CASE
+              WHEN total_orders > 20 THEN 2.0
+              WHEN total_orders > 10 THEN 1.5
+              WHEN total_orders > 5 THEN 1.0
+              ELSE 0.5
+            END as priority_score,
+            CASE
+              WHEN last_order_date IS NULL THEN 'New customer - never ordered'
+              WHEN EXTRACT(DAY FROM NOW() - last_order_date) > 30 THEN 'Overdue for order - ' || EXTRACT(DAY FROM NOW() - last_order_date)::INTEGER || ' days'
+              WHEN avg_order_value > 50000 THEN 'High-value customer'
+              WHEN total_orders > 20 THEN 'Regular customer'
+              ELSE 'Standard follow-up'
+            END as priority_reason
+          FROM store_orders
+        ),
+        ranked_stores AS (
+          SELECT *,
+            ROW_NUMBER() OVER (ORDER BY priority_score DESC) as priority_rank
+          FROM priority_scores
+        )
+        SELECT
+          rs.priority_rank as "priorityScore",
+          rs.id as "storeId",
+          rs.priority_score as "actualScore",
+          rs.priority_reason as "priorityReason",
+          CASE
+            WHEN rs.last_order_date IS NOT NULL THEN rs.last_order_date::text
+            ELSE NULL
+          END as "lastCallDate",
+          (CURRENT_DATE + INTERVAL '3 days')::text as "nextCallDate",
+          'Pending' as status
+        FROM ranked_stores rs
+        WHERE rs.id = $1
+      `;
+
+      const result = await db.query(query, [storeId]);
+
+      if (result.rows.length > 0) {
+        res.json({
+          success: true,
+          data: result.rows[0]
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: 'Store not found in priority list'
+        });
+      }
+    } catch (error) {
+      logger.error('Error fetching store priority', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch store priority'
+      });
+    }
+  });
+
   // Get next priority call after current store
   router.get('/calls/next-priority/:storeId', async (req: Request, res: Response) => {
     try {
