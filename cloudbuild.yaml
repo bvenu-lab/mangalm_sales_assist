@@ -46,40 +46,10 @@ steps:
 
         echo "Secrets setup complete"
 
-  # Build TypeScript services before deployment
-  - name: 'node:18'
-    id: 'build-services'
-    waitFor: ['setup-secrets']
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "Building TypeScript services..."
-
-        # Build API Gateway
-        cd services/api-gateway
-        npm ci
-        npm run build
-        cd ../..
-
-        # Build AI Prediction Service
-        cd services/ai-prediction-service
-        npm ci
-        npm run build
-        cd ../..
-
-        # Build Document Processor
-        cd services/document-processor
-        npm ci
-        npm run build
-        cd ../..
-
-        echo "Build complete"
-
-  # Deploy API Gateway using buildpacks
+  # Deploy API Gateway first (other services may depend on it)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api-gateway'
-    waitFor: ['build-services']
+    waitFor: ['setup-secrets']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-api-gateway',
@@ -94,13 +64,14 @@ steps:
        '--min-instances', '1',
        '--max-instances', '50',
        '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DISABLE_REDIS=true',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy Bulk Upload API using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-bulk-upload-api'
+    waitFor: ['setup-secrets']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-bulk-upload-api',
@@ -115,13 +86,14 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '900',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,REDIS_URL=redis://localhost:6379',
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DISABLE_REDIS=true',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy AI Prediction Service using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-ai-prediction'
+    waitFor: ['setup-secrets']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-ai-prediction',
@@ -143,6 +115,7 @@ steps:
   # Deploy Document Processor using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-document-processor'
+    waitFor: ['setup-secrets']
     entrypoint: gcloud
     args:
       ['run', 'deploy', 'mangalm-document-processor',
@@ -184,10 +157,26 @@ steps:
         echo $$AI_URL > /workspace/ai-prediction-url.txt
         echo $$DOC_URL > /workspace/document-processor-url.txt
 
+  # Update API Gateway with service URLs
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'update-api-gateway'
+    waitFor: ['get-service-urls']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        BULK_URL=$(cat /workspace/bulk-upload-url.txt)
+        AI_URL=$(cat /workspace/ai-prediction-url.txt)
+        DOC_URL=$(cat /workspace/document-processor-url.txt)
+
+        gcloud run services update mangalm-api-gateway \
+          --region=${_REGION} \
+          --update-env-vars="BULK_UPLOAD_API_URL=$$BULK_URL,AI_PREDICTION_URL=$$AI_URL,DOCUMENT_PROCESSOR_URL=$$DOC_URL"
+
   # Deploy Sales Frontend using buildpacks with service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-sales-frontend'
-    waitFor: ['get-service-urls']
+    waitFor: ['update-api-gateway']
     entrypoint: bash
     args:
       - '-c'
@@ -195,6 +184,7 @@ steps:
         API_URL=$(cat /workspace/api-gateway-url.txt)
         BULK_URL=$(cat /workspace/bulk-upload-url.txt)
         DOC_URL=$(cat /workspace/document-processor-url.txt)
+        AI_URL=$(cat /workspace/ai-prediction-url.txt)
 
         gcloud run deploy mangalm-sales-frontend \
           --source=./services/sales-frontend \
@@ -208,7 +198,7 @@ steps:
           --min-instances=0 \
           --max-instances=10 \
           --timeout=300 \
-          --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL"
+          --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL,REACT_APP_AI_PREDICTION_URL=$$AI_URL"
 
   # Zoho Integration Service - DISABLED FOR NOW
   # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -228,5 +218,37 @@ steps:
   #      '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
   #      '--set-secrets', 'DB_PASSWORD=db-password:latest',
   #      '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
+
+  # Final deployment summary
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deployment-summary'
+    waitFor: ['deploy-sales-frontend']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        echo "========================================="
+        echo "DEPLOYMENT SUMMARY"
+        echo "========================================="
+        echo ""
+        echo "Deployed Services:"
+        echo ""
+
+        # Get all service URLs
+        FRONTEND_URL=$(gcloud run services describe mangalm-sales-frontend --region=${_REGION} --format='value(status.url)')
+        API_URL=$(gcloud run services describe mangalm-api-gateway --region=${_REGION} --format='value(status.url)')
+        BULK_URL=$(gcloud run services describe mangalm-bulk-upload-api --region=${_REGION} --format='value(status.url)')
+        AI_URL=$(gcloud run services describe mangalm-ai-prediction --region=${_REGION} --format='value(status.url)')
+        DOC_URL=$(gcloud run services describe mangalm-document-processor --region=${_REGION} --format='value(status.url)')
+
+        echo "Sales Frontend: $$FRONTEND_URL"
+        echo "API Gateway: $$API_URL"
+        echo "Bulk Upload API: $$BULK_URL"
+        echo "AI Prediction Service: $$AI_URL"
+        echo "Document Processor: $$DOC_URL"
+        echo ""
+        echo "========================================="
+        echo "Access your application at: $$FRONTEND_URL"
+        echo "========================================="
 
 timeout: 1800s
