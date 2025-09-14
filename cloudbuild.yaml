@@ -212,7 +212,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-frontend-docker'
     waitFor: ['build-sales-frontend']
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/mangalm-sales-frontend:latest', '-f', './services/sales-frontend/Dockerfile.simple', './services/sales-frontend']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/mangalm-sales-frontend:latest', '-f', './services/sales-frontend/Dockerfile.simple', '.']
 
   # Push Docker image
   - name: 'gcr.io/cloud-builders/docker'

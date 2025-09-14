@@ -1,0 +1,6 @@
+# Ignore everything except what we need for frontend
+**
+!services/sales-frontend/build/**
+!services/sales-frontend/server.js
+!services/sales-frontend/package.json
+!services/sales-frontend/package-lock.json

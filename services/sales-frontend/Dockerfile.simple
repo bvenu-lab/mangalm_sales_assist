@@ -3,9 +3,9 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy only the built app and server
-COPY build ./build
-COPY server.js ./
-COPY package*.json ./
+COPY services/sales-frontend/build ./build
+COPY services/sales-frontend/server.js ./
+COPY services/sales-frontend/package*.json ./
 
 # Install only express
 RUN npm install express
