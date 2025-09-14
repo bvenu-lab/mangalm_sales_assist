@@ -144,6 +144,7 @@ const StoreDetailPage: React.FC = () => {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [historicalInvoices, setHistoricalInvoices] = useState<HistoricalInvoice[]>([]);
   const [callPrioritization, setCallPrioritization] = useState<CallPrioritization | null>(null);
+  const [totalStores, setTotalStores] = useState<number>(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -517,7 +518,10 @@ const StoreDetailPage: React.FC = () => {
         console.log('[StoreDetailPage] Call prioritization response:', callResponse);
         // Extract and find relevant call prioritization for this store
         const callData = callResponse?.success ? callResponse.data : callResponse?.data || callResponse || [];
-        const storeCallData = Array.isArray(callData) ? 
+        const totalStoreCount = callResponse?.totalStores || callResponse?.total || 100; // Default to 100 if not provided
+        setTotalStores(totalStoreCount);
+
+        const storeCallData = Array.isArray(callData) ?
           callData.find((c: any) => c.store_id === id || c.storeId === id) : null;
         if (storeCallData) {
           // Map snake_case to camelCase
@@ -976,12 +980,22 @@ const StoreDetailPage: React.FC = () => {
                     </Typography>
                     <Chip
                       label={
-                        callPrioritization.priorityScore <= 10 ? 'High' :
-                        callPrioritization.priorityScore <= 50 ? 'Medium' : 'Low'
+                        (() => {
+                          // Calculate percentage position
+                          const percentile = (callPrioritization.priorityScore / totalStores) * 100;
+                          // Top 20% = High priority, Next 40% = Medium, Bottom 40% = Low
+                          if (percentile <= 20) return 'High';
+                          if (percentile <= 60) return 'Medium';
+                          return 'Low';
+                        })()
                       }
                       color={
-                        callPrioritization.priorityScore <= 10 ? 'error' :
-                        callPrioritization.priorityScore <= 50 ? 'warning' : 'default'
+                        (() => {
+                          const percentile = (callPrioritization.priorityScore / totalStores) * 100;
+                          if (percentile <= 20) return 'error';
+                          if (percentile <= 60) return 'warning';
+                          return 'default';
+                        })()
                       }
                       size="small"
                     />

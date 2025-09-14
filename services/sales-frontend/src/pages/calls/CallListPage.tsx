@@ -51,6 +51,7 @@ const CallListPage: React.FC = () => {
   // Calls state
   const [calls, setCalls] = useState<CallPrioritization[]>([]);
   const [filteredCalls, setFilteredCalls] = useState<CallPrioritization[]>([]);
+  const [totalStores, setTotalStores] = useState<number>(0);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,9 +82,11 @@ const CallListPage: React.FC = () => {
         const response = await api.callPrioritization.getAll();
         console.log('[CallListPage] API Response:', response);
         const callsData = response?.data || [];
-        console.log('[CallListPage] Extracted calls data:', callsData);
+        const totalCount = response?.totalStores || response?.total || 100; // Default to 100 if not provided
+        console.log('[CallListPage] Extracted calls data:', callsData, 'Total stores:', totalCount);
         setCalls(callsData);
         setFilteredCalls(callsData);
+        setTotalStores(totalCount);
         setLoading(false);
       } catch (err) {
         setError('Failed to fetch call data. Please try again later.');
@@ -243,10 +246,13 @@ const CallListPage: React.FC = () => {
     }
   };
   
-  // Get priority level label and color
+  // Get priority level label and color based on percentile
   const getPriorityLevel = (score: number) => {
-    if (score >= 8) return { label: 'High', color: 'error' as const };
-    if (score >= 5) return { label: 'Medium', color: 'warning' as const };
+    // Calculate percentage position
+    const percentile = totalStores > 0 ? (score / totalStores) * 100 : 50;
+    // Top 20% = High priority, Next 40% = Medium, Bottom 40% = Low
+    if (percentile <= 20) return { label: 'High', color: 'error' as const };
+    if (percentile <= 60) return { label: 'Medium', color: 'warning' as const };
     return { label: 'Low', color: 'default' as const };
   };
   
@@ -320,7 +326,10 @@ const CallListPage: React.FC = () => {
                 High Priority
               </Typography>
               <Typography variant="h3" color="error" gutterBottom>
-                {calls.filter(call => call.priorityScore >= 8 && call.status === 'Pending').length}
+                {calls.filter(call => {
+                  const percentile = totalStores > 0 ? (call.priorityScore / totalStores) * 100 : 50;
+                  return percentile <= 20 && call.status === 'Pending';
+                }).length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 High priority calls that need attention

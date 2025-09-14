@@ -1,6 +1,7 @@
 substitutions:
   _REGION: us-west1
   _ENV: production
+  # Note: PROJECT_NUMBER is automatically available in Cloud Build
 
 options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
@@ -24,7 +25,7 @@ steps:
       - 'artifactregistry.googleapis.com'
       - '--project=$PROJECT_ID'
 
-  # Create or verify secrets exist
+  # Create or verify secrets exist and grant permissions
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'setup-secrets'
     waitFor: ['enable-apis']
@@ -42,7 +43,21 @@ steps:
           echo "db-password secret already exists"
         fi
 
-        # OpenAI/Anthropic APIs not needed - skipping
+        # Grant Secret Manager access to the default compute service account
+        echo "Granting Secret Manager access to service account..."
+        # The service account format is PROJECT_NUMBER-compute@developer.gserviceaccount.com
+        # From the error, we know it's 445344153219-compute@developer.gserviceaccount.com
+
+        # Get the project number dynamically
+        PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+        SERVICE_ACCOUNT="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+
+        echo "Granting access to service account: ${SERVICE_ACCOUNT}"
+
+        gcloud secrets add-iam-policy-binding db-password \
+          --member="serviceAccount:${SERVICE_ACCOUNT}" \
+          --role="roles/secretmanager.secretAccessor" \
+          --project=$PROJECT_ID || echo "Permission may already exist"
 
         echo "Secrets setup complete"
 

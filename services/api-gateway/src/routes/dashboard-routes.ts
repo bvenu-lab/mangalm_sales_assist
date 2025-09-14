@@ -115,9 +115,15 @@ export function createDashboardRoutes(): Router {
         storeId: row.storeId
       }));
       
+      // Get total count of stores for percentage calculation
+      const countQuery = `SELECT COUNT(*) as total FROM stores`;
+      const countResult = await db.query(countQuery);
+      const totalStores = parseInt(countResult.rows[0].total) || 0;
+
       res.json({
         success: true,
         data: mappedRows,
+        totalStores: totalStores,
         total: result.rowCount
       });
     } catch (error) {
