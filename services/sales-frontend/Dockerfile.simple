@@ -5,10 +5,12 @@ WORKDIR /app
 # Copy only the built app and server
 COPY services/sales-frontend/build ./build
 COPY services/sales-frontend/server.js ./
-COPY services/sales-frontend/package*.json ./
+
+# Create minimal package.json with only express
+RUN echo '{"name":"frontend","version":"1.0.0","dependencies":{"express":"^4.18.2"}}' > package.json
 
 # Install only express
-RUN npm install express
+RUN npm install
 
 # Expose port
 EXPOSE 8080
