@@ -98,7 +98,7 @@ const FeedbackAssistant: React.FC<FeedbackAssistantProps> = ({
     setErrorMessage('');
 
     try {
-      const response = await apiGatewayClient.post('/api/feedback/submit', {
+      const result = await apiGatewayClient.post('/api/feedback/submit', {
         type: feedbackType || 'general',
         message: feedbackText,
         userEmail,
@@ -111,17 +111,19 @@ const FeedbackAssistant: React.FC<FeedbackAssistantProps> = ({
         }
       });
 
-      console.log('[Feedback] Response received:', response);
-      console.log('[Feedback] Response data:', response.data);
-      console.log('[Feedback] Response success flag:', response.data?.success);
+      console.log('[Feedback] API result:', result);
+      console.log('[Feedback] Success flag:', result?.success);
+      console.log('[Feedback] Data field:', result?.data);
 
-      if (response.data && response.data.success) {
+      // The apiGatewayClient.post returns response.data directly
+      // So 'result' is already the data payload from the API
+      if (result && result.success) {
         setSubmitStatus('success');
         setTimeout(() => {
           handleClose();
         }, 3000);
       } else {
-        throw new Error(response.data?.error || 'Failed to send feedback');
+        throw new Error(result?.error || 'Failed to send feedback');
       }
     } catch (error: any) {
       console.error('Error submitting feedback:', error);

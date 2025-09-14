@@ -3,6 +3,8 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const { Pool } = require('pg');
 
 const app = express();
@@ -17,13 +19,20 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres',
 });
 
-// Middleware
+// Security middleware
+app.use(helmet());
+app.use(compression());
+
+// CORS middleware
 app.use(cors({
   origin: process.env.CORS_ALLOWED_ORIGINS ?
     process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()) :
     '*'
 }));
+
+// Body parsing middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
