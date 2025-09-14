@@ -153,7 +153,8 @@
       "Bash(start http://localhost:3000/stores/4261931000000327001)",
       "Bash(start http://localhost:3000)",
       "Bash(git log:*)",
-      "Bash(start http://localhost:3000/stores)"
+      "Bash(start http://localhost:3000/stores)",
+      "Bash(npm ci:*)"
     ],
     "deny": [],
     "ask": []
