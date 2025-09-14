@@ -111,13 +111,17 @@ const FeedbackAssistant: React.FC<FeedbackAssistantProps> = ({
         }
       });
 
-      if (response.data.success) {
+      console.log('[Feedback] Response received:', response);
+      console.log('[Feedback] Response data:', response.data);
+      console.log('[Feedback] Response success flag:', response.data?.success);
+
+      if (response.data && response.data.success) {
         setSubmitStatus('success');
         setTimeout(() => {
           handleClose();
         }, 3000);
       } else {
-        throw new Error(response.data.error || 'Failed to send feedback');
+        throw new Error(response.data?.error || 'Failed to send feedback');
       }
     } catch (error: any) {
       console.error('Error submitting feedback:', error);

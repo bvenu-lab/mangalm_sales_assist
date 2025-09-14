@@ -10,6 +10,7 @@ export interface Store {
   region?: string;
   phone?: string;
   email?: string;
+  customer_number?: string;
   contactPerson?: string;
   storeSize?: string;
   callFrequency?: string;
@@ -199,20 +200,28 @@ export class StoreRepository {
       const query = `
         UPDATE stores
         SET name = COALESCE($2, name),
-            city = COALESCE($3, city),
-            state = COALESCE($4, state)
+            address = COALESCE($3, address),
+            city = COALESCE($4, city),
+            state = COALESCE($5, state),
+            phone = COALESCE($6, phone),
+            email = COALESCE($7, email),
+            customer_number = COALESCE($8, customer_number)
         WHERE id = $1
         RETURNING *
       `;
       const values = [
         id,
         store.name,
+        store.address,
         store.city,
-        store.state || store.region
+        store.state || store.region,
+        store.phone,
+        store.email,
+        store.customer_number
       ];
 
       const result = await db.query(query, values);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Store not found');
       }

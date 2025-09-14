@@ -1,0 +1,20 @@
+{
+  "name": "document-processor",
+  "version": "1.0.0",
+  "description": "Document processing service - Cloud Run version",
+  "main": "simple-server.js",
+  "scripts": {
+    "start": "node simple-server.js",
+    "build": "echo 'Using simple server for Cloud Run'"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.11.1",
+    "compression": "^1.7.4",
+    "helmet": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

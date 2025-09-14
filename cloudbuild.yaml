@@ -112,27 +112,35 @@ steps:
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
-  # Deploy Document Processor using buildpacks
+  # Deploy Document Processor (simplified version for Cloud Run)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-document-processor'
     waitFor: ['setup-secrets']
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      ['run', 'deploy', 'mangalm-document-processor',
-       '--source', './services/document-processor',
-       '--platform', 'managed',
-       '--region', '${_REGION}',
-       '--allow-unauthenticated',
-       '--port', '3008',
-       '--cpu', '2',
-       '--memory', '2Gi',
-       '--concurrency', '20',
-       '--min-instances', '0',
-       '--max-instances', '10',
-       '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
-       '--set-secrets', 'DB_PASSWORD=db-password:latest',
-       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
+      - '-c'
+      - |
+        echo "Preparing document-processor for Cloud Run..."
+        # Copy simplified package.json to avoid heavy dependencies build issues
+        if [ -f "./services/document-processor/package-cloud.json" ]; then
+          cp ./services/document-processor/package-cloud.json ./services/document-processor/package.json
+        fi
+
+        gcloud run deploy mangalm-document-processor \
+          --source=./services/document-processor \
+          --platform=managed \
+          --region=${_REGION} \
+          --allow-unauthenticated \
+          --port=3008 \
+          --cpu=1 \
+          --memory=1Gi \
+          --concurrency=20 \
+          --min-instances=0 \
+          --max-instances=5 \
+          --timeout=300 \
+          --set-env-vars="NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres" \
+          --set-secrets="DB_PASSWORD=db-password:latest" \
+          --add-cloudsql-instances="$PROJECT_ID:${_REGION}:mangalm-db"
 
   # Get service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

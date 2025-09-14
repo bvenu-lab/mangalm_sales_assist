@@ -1,0 +1,23 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud.
+
+.gcloudignore
+.git
+.gitignore
+node_modules/
+src/
+tests/
+*.test.ts
+*.spec.ts
+.env
+.env.local
+README.md
+*.log
+coverage/
+.vscode/
+.idea/
+*.map
+tsconfig.json
+jest.config.js
+.eslintrc.js
+nodemon.json

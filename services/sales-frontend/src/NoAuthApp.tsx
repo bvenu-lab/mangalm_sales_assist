@@ -4,6 +4,7 @@ import MainLayout from './components/layouts/MainLayout';
 import EnhancedDashboard from './pages/dashboard/EnhancedDashboard';
 import StoreListPage from './pages/stores/StoreListPage';
 import StoreDetailPage from './pages/stores/StoreDetailPage';
+import StoreEditPage from './pages/stores/StoreEditPage';
 import CallListPage from './pages/calls/CallListPage';
 import OrderCreatePage from './pages/orders/OrderCreatePage';
 import OrderDetailPage from './pages/orders/OrderDetailPage';
@@ -31,6 +32,7 @@ const NoAuthApp: React.FC = () => {
             <Route path="documents" element={<DocumentProcessingPage />} />
             <Route path="stores" element={<StoreListPage />} />
             <Route path="stores/:id" element={<StoreDetailPage />} />
+            <Route path="stores/:id/edit" element={<StoreEditPage />} />
             <Route path="calls" element={<CallListPage />} />
             <Route path="orders/create" element={<OrderCreatePage />} />
             <Route path="orders/import" element={<ImportOrdersPage />} />
