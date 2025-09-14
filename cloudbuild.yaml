@@ -179,18 +179,39 @@ steps:
           --region=${_REGION} \
           --update-env-vars="BULK_UPLOAD_API_URL=$$BULK_URL,AI_PREDICTION_URL=$$AI_URL,DOCUMENT_PROCESSOR_URL=$$DOC_URL"
 
+  # Build React app before deploying
+  - name: 'node:18'
+    id: 'build-frontend'
+    waitFor: ['update-api-gateway']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        cd services/sales-frontend
+
+        # Create .env.production with service URLs
+        API_URL=$(cat /workspace/api-gateway-url.txt)
+        BULK_URL=$(cat /workspace/bulk-upload-url.txt)
+
+        echo "REACT_APP_API_GATEWAY_URL=$$API_URL" > .env.production
+        echo "REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL" >> .env.production
+        echo "REACT_APP_ENV=production" >> .env.production
+        echo "GENERATE_SOURCEMAP=false" >> .env.production
+
+        # Install dependencies and build
+        npm ci
+        npm run build
+
   # Deploy Sales Frontend using buildpacks with service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-sales-frontend'
-    waitFor: ['update-api-gateway']
+    waitFor: ['build-frontend']
     entrypoint: bash
     args:
       - '-c'
       - |
         API_URL=$(cat /workspace/api-gateway-url.txt)
         BULK_URL=$(cat /workspace/bulk-upload-url.txt)
-        DOC_URL=$(cat /workspace/document-processor-url.txt)
-        AI_URL=$(cat /workspace/ai-prediction-url.txt)
 
         gcloud run deploy mangalm-sales-frontend \
           --source=./services/sales-frontend \
@@ -204,7 +225,7 @@ steps:
           --min-instances=0 \
           --max-instances=10 \
           --timeout=300 \
-          --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL,REACT_APP_AI_PREDICTION_URL=$$AI_URL"
+          --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL"
 
   # Update all backend services with frontend URL for CORS
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
