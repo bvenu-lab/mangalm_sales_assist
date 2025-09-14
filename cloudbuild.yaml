@@ -37,18 +37,12 @@ steps:
         # Check if db-password secret exists, create if not
         if ! gcloud secrets describe db-password --project=$PROJECT_ID &>/dev/null; then
           echo "Creating db-password secret..."
-          echo -n "mangalm123" | gcloud secrets create db-password --data-file=- --project=$PROJECT_ID
+          echo -n "MangalmDB2024!Secure" | gcloud secrets create db-password --data-file=- --project=$PROJECT_ID
         else
           echo "db-password secret already exists"
         fi
 
-        # Check if openai-api-key secret exists, create if not
-        if ! gcloud secrets describe openai-api-key --project=$PROJECT_ID &>/dev/null; then
-          echo "Creating openai-api-key secret..."
-          echo -n "your-openai-key-here" | gcloud secrets create openai-api-key --data-file=- --project=$PROJECT_ID
-        else
-          echo "openai-api-key secret already exists"
-        fi
+        # OpenAI/Anthropic APIs not needed - skipping
 
         echo "Secrets setup complete"
 
@@ -100,7 +94,9 @@ steps:
        '--min-instances', '1',
        '--max-instances', '50',
        '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=localhost,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DB_PASSWORD=temp123']
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy Bulk Upload API using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -119,7 +115,9 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '900',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=localhost,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DB_PASSWORD=temp123,REDIS_URL=redis://localhost:6379']
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,REDIS_URL=redis://localhost:6379',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy AI Prediction Service using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -138,7 +136,9 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=localhost,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DB_PASSWORD=temp123']
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Deploy Document Processor using buildpacks
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -157,7 +157,9 @@ steps:
        '--min-instances', '0',
        '--max-instances', '10',
        '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=localhost,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DB_PASSWORD=temp123,OPENAI_API_KEY=sk-temp-key']
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-secrets', 'DB_PASSWORD=db-password:latest',
+       '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
   # Get service URLs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
