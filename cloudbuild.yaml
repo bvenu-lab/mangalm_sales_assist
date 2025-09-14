@@ -44,19 +44,15 @@ steps:
 
         # Grant Secret Manager access to the default compute service account
         echo "Granting Secret Manager access to service account..."
-        # The service account format is PROJECT_NUMBER-compute@developer.gserviceaccount.com
 
-        # Get the project number using gcloud (PROJECT_NUMBER is not available in all contexts)
-        echo "Getting project number for $PROJECT_ID..."
-        PROJ_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-        SERVICE_ACCOUNT="${PROJ_NUMBER}-compute@developer.gserviceaccount.com"
-
-        echo "Granting access to service account: ${SERVICE_ACCOUNT}"
-
+        # Grant access directly using the project number in the command
+        # This avoids any variable name confusion with Cloud Build substitutions
         gcloud secrets add-iam-policy-binding db-password \
-          --member="serviceAccount:${SERVICE_ACCOUNT}" \
+          --member="serviceAccount:$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
           --role="roles/secretmanager.secretAccessor" \
           --project=$PROJECT_ID || echo "Permission may already exist"
+
+        echo "Service account permissions configured"
 
         echo "Secrets setup complete"
 
