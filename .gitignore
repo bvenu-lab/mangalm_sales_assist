@@ -74,6 +74,7 @@ web_modules/
 .env.production.local
 .env.*.local
 .env.example.local
+.env.enterprise
 
 # Configuration files with sensitive data
 config/local.json
