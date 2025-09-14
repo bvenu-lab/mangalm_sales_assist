@@ -28,8 +28,12 @@ export function createCorsConfig() {
         }
       }
 
-      // Default allowed origins for local release 1
-      const allowedOrigins = [
+      // Get allowed origins from environment or use defaults
+      const envOrigins = process.env.CORS_ALLOWED_ORIGINS ?
+        process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [];
+
+      // Default allowed origins for local development
+      const defaultOrigins = isDevelopment ? [
         'http://localhost:3000',
         'http://localhost:3005',
         'http://localhost:8080',
@@ -37,7 +41,9 @@ export function createCorsConfig() {
         'http://127.0.0.1:3005',
         'http://127.0.0.1:8080',
         'file://'
-      ];
+      ] : [];
+
+      const allowedOrigins = [...envOrigins, ...defaultOrigins];
 
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);

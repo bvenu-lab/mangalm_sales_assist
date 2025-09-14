@@ -45,13 +45,13 @@ const ENTERPRISE_CONFIG = {
     RETRY_DELAY: 1000, // 1 second base delay
 };
 
-// Database configuration - using Docker postgres
+// Database configuration - using environment variables for Cloud Run
 const dbConfig = {
-    user: 'mangalm',
-    host: 'localhost',
-    database: 'mangalm_sales',
-    password: 'mangalm_secure_password',
-    port: 3432,  // Docker mapped port
+    user: process.env.DB_USER || 'mangalm',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'mangalm_sales',
+    password: process.env.DB_PASSWORD || 'mangalm_secure_password',
+    port: parseInt(process.env.DB_PORT || '3432'),
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
@@ -311,25 +311,38 @@ async function initializeConnections() {
         await pool.query('SELECT 1');
         logger.info('DATABASE', 'Connected successfully');
 
-        // Redis connection - using Docker Redis
-        redisClient = Redis.createClient({ port: 3379, host: 'localhost' });
-        await redisClient.connect();
-        logger.info('REDIS', 'Connected successfully');
+        // Redis connection - skip if disabled for Cloud Run
+        if (process.env.DISABLE_REDIS !== 'true') {
+            redisClient = Redis.createClient({
+                port: parseInt(process.env.REDIS_PORT || '3379'),
+                host: process.env.REDIS_HOST || 'localhost'
+            });
+            await redisClient.connect();
+            logger.info('REDIS', 'Connected successfully');
+        } else {
+            logger.info('REDIS', 'Disabled for Cloud Run - using in-memory');
+        }
 
-        // Bull queue
-        processingQueue = new Bull('bulk upload queue', { 
-            redis: { port: 3379, host: 'localhost' },
-            defaultJobOptions: {
-                attempts: ENTERPRISE_CONFIG.RETRY_ATTEMPTS,
-                backoff: {
-                    type: 'exponential',
-                    delay: ENTERPRISE_CONFIG.RETRY_DELAY,
+        // Bull queue - skip if Redis disabled
+        if (process.env.DISABLE_REDIS !== 'true') {
+            processingQueue = new Bull('bulk upload queue', {
+                redis: {
+                    port: parseInt(process.env.REDIS_PORT || '3379'),
+                    host: process.env.REDIS_HOST || 'localhost'
                 },
-            }
-        });
+                defaultJobOptions: {
+                    attempts: ENTERPRISE_CONFIG.RETRY_ATTEMPTS,
+                    backoff: {
+                        type: 'exponential',
+                        delay: ENTERPRISE_CONFIG.RETRY_DELAY,
+                    },
+                }
+            });
+            logger.info('QUEUE', 'Initialized successfully');
+        } else {
+            logger.info('QUEUE', 'Skipped - Redis disabled for Cloud Run');
+        }
 
-        logger.info('QUEUE', 'Initialized successfully');
-        
         // Setup queue processor after initialization
         setupQueueProcessor();
         
@@ -622,7 +635,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 const storage = multer.diskStorage({
-    destination: './uploads/',
+    destination: process.env.UPLOAD_DIR || (process.env.NODE_ENV === 'production' ? '/tmp' : './uploads/'),
     filename: (req, file, cb) => {
         cb(null, `${Date.now()}-${file.originalname}`);
     }
@@ -857,10 +870,14 @@ async function startServer() {
 
     await initializeConnections();
 
-    // Create upload directory
-    if (!fs.existsSync('./uploads')) {
-        fs.mkdirSync('./uploads');
+    // Create upload directory (only for non-production)
+    if (process.env.NODE_ENV !== 'production') {
+        const uploadDir = process.env.UPLOAD_DIR || './uploads';
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
     }
+    // In production (Cloud Run), /tmp is always available
 
     app.listen(PORT, () => {
         logger.info('SERVER', `Enterprise server started on port ${PORT}`);

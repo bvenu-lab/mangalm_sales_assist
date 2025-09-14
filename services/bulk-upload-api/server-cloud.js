@@ -1,5 +1,12 @@
 // Cloud Run compatible version of the bulk upload server
-// This wrapper handles Redis dependency for Cloud Run deployment
+// This wrapper handles Redis dependency and database configuration for Cloud Run deployment
+
+// Override database configuration from environment variables
+process.env.DB_HOST = process.env.DB_HOST || '/cloudsql/PROJECT_ID:REGION:mangalm-db';
+process.env.DB_PORT = process.env.DB_PORT || '5432';
+process.env.DB_NAME = process.env.DB_NAME || 'mangalm_sales';
+process.env.DB_USER = process.env.DB_USER || 'postgres';
+// DB_PASSWORD should come from Secret Manager
 
 const originalServer = './server-enterprise-v2.js';
 

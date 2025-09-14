@@ -22,8 +22,12 @@ app.use((req: any, res: any, next: any) => {
 app.use(helmet());
 
 // Enable Cross Origin Resource Sharing
+const corsOrigins = process.env.CORS_ALLOWED_ORIGINS ?
+  process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()) :
+  ['http://localhost:3000', 'http://localhost:3001'];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: corsOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));

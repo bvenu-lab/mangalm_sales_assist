@@ -108,7 +108,7 @@ steps:
        '--min-instances', '0',
        '--max-instances', '20',
        '--timeout', '300',
-       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres',
+       '--set-env-vars', 'NODE_ENV=production,DB_HOST=/cloudsql/$PROJECT_ID:${_REGION}:mangalm-db,DB_PORT=5432,DB_NAME=mangalm_sales,DB_USER=postgres,DISABLE_REDIS=true',
        '--set-secrets', 'DB_PASSWORD=db-password:latest',
        '--add-cloudsql-instances', '$PROJECT_ID:${_REGION}:mangalm-db']
 
@@ -200,6 +200,34 @@ steps:
           --timeout=300 \
           --set-env-vars="NODE_ENV=production,REACT_APP_API_GATEWAY_URL=$$API_URL,REACT_APP_BULK_UPLOAD_API_URL=$$BULK_URL,REACT_APP_DOCUMENT_PROCESSOR_URL=$$DOC_URL,REACT_APP_AI_PREDICTION_URL=$$AI_URL"
 
+  # Update all backend services with frontend URL for CORS
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'configure-cors'
+    waitFor: ['deploy-sales-frontend']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        FRONTEND_URL=$(gcloud run services describe mangalm-sales-frontend --region=${_REGION} --format='value(status.url)')
+        echo "Configuring CORS for frontend URL: $$FRONTEND_URL"
+
+        # Update all services with CORS configuration
+        gcloud run services update mangalm-api-gateway \
+          --region=${_REGION} \
+          --update-env-vars="CORS_ALLOWED_ORIGINS=$$FRONTEND_URL"
+
+        gcloud run services update mangalm-bulk-upload-api \
+          --region=${_REGION} \
+          --update-env-vars="CORS_ALLOWED_ORIGINS=$$FRONTEND_URL"
+
+        gcloud run services update mangalm-ai-prediction \
+          --region=${_REGION} \
+          --update-env-vars="CORS_ALLOWED_ORIGINS=$$FRONTEND_URL"
+
+        gcloud run services update mangalm-document-processor \
+          --region=${_REGION} \
+          --update-env-vars="CORS_ALLOWED_ORIGINS=$$FRONTEND_URL"
+
   # Zoho Integration Service - DISABLED FOR NOW
   # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   #   id: 'deploy-zoho-integration'
@@ -222,7 +250,7 @@ steps:
   # Final deployment summary
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deployment-summary'
-    waitFor: ['deploy-sales-frontend']
+    waitFor: ['configure-cors']
     entrypoint: bash
     args:
       - '-c'
