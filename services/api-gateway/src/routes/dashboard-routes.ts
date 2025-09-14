@@ -89,6 +89,7 @@ export function createDashboardRoutes(): Router {
             'region', COALESCE(rs.address, '')
           ) as store,
           rs.priority_rank as "priorityScore",
+          rs.priority_score as "actualScore",
           rs.priority_reason as "priorityReason",
           CASE
             WHEN rs.last_order_date IS NOT NULL THEN rs.last_order_date::text

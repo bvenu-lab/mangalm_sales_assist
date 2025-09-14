@@ -1163,7 +1163,7 @@ const StoreDetailPage: React.FC = () => {
                   </ToggleButtonGroup>
                 </Box>
                 
-                {!chartData || chartData.length === 0 ? (
+                {!chartData || !Array.isArray(chartData) || chartData.length === 0 ? (
                   <Alert severity="info">No sales data available for the selected period</Alert>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
@@ -1201,7 +1201,7 @@ const StoreDetailPage: React.FC = () => {
                         ))}
                         
                         {/* Add comparison reference lines if enabled */}
-                        {comparisonMode === 'yoy' && chartData && chartData.length > 12 && (
+                        {comparisonMode === 'yoy' && chartData && Array.isArray(chartData) && chartData.length > 12 && (
                           <ReferenceLine
                             yAxisId="left"
                             y={chartData[chartData.length - 13]?.totalRevenue || 0}
@@ -1349,7 +1349,7 @@ const StoreDetailPage: React.FC = () => {
                   />
                 </FormGroup>
                 
-                {productSalesData && productSalesData.length > 0 && (
+                {productSalesData && Array.isArray(productSalesData) && productSalesData.length > 0 && (
                   <>
                     <Divider sx={{ my: 2 }} />
                     <Typography variant="subtitle2" gutterBottom>
@@ -1393,7 +1393,7 @@ const StoreDetailPage: React.FC = () => {
                       <Typography variant="h5">
                         ${chartData ? chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0).toFixed(2) : '0.00'}
                       </Typography>
-                      {comparisonMode === 'yoy' && chartData && chartData.length > 12 && chartData[chartData.length - 13]?.totalRevenue > 0 && (
+                      {comparisonMode === 'yoy' && chartData && Array.isArray(chartData) && chartData.length > 12 && chartData[chartData.length - 13]?.totalRevenue > 0 && (
                         <Typography variant="body2" color={chartData[chartData.length - 1]?.totalRevenue > chartData[chartData.length - 13]?.totalRevenue ? 'success.main' : 'error.main'}>
                           {(((chartData[chartData.length - 1]?.totalRevenue || 0) - (chartData[chartData.length - 13]?.totalRevenue || 0)) / chartData[chartData.length - 13].totalRevenue * 100).toFixed(1)}% YoY
                         </Typography>
@@ -1420,7 +1420,7 @@ const StoreDetailPage: React.FC = () => {
                         Average Order Value
                       </Typography>
                       <Typography variant="h5">
-                        ${chartData && chartData.length > 0 ? (chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0) / Math.max(1, chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0))).toFixed(2) : '0.00'}
+                        ${chartData && Array.isArray(chartData) && chartData.length > 0 ? (chartData.reduce((sum, d) => sum + (d.totalRevenue || 0), 0) / Math.max(1, chartData.reduce((sum, d) => sum + (d.orderCount || 0), 0))).toFixed(2) : '0.00'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1432,7 +1432,7 @@ const StoreDetailPage: React.FC = () => {
                         Peak Month
                       </Typography>
                       <Typography variant="h5">
-                        {chartData && chartData.length > 0 ? chartData.reduce((peak, d) => (d?.totalRevenue || 0) > (peak?.totalRevenue || 0) ? d : peak, chartData[0])?.date || 'N/A' : 'N/A'}
+                        {chartData && Array.isArray(chartData) && chartData.length > 0 ? chartData.reduce((peak, d) => (d?.totalRevenue || 0) > (peak?.totalRevenue || 0) ? d : peak, chartData[0])?.date || 'N/A' : 'N/A'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1458,7 +1458,7 @@ const StoreDetailPage: React.FC = () => {
             </Button>
           </Box>
 
-          {!predictedOrders || predictedOrders.length === 0 ? (
+          {!predictedOrders || !Array.isArray(predictedOrders) || predictedOrders.length === 0 ? (
             <Alert severity="info">
               No predicted orders available for this store.
             </Alert>
@@ -1693,7 +1693,7 @@ const StoreDetailPage: React.FC = () => {
           </Typography>
           
           {/* Recent Orders from Document Uploads */}
-          {recentOrders && recentOrders.length > 0 && (
+          {recentOrders && Array.isArray(recentOrders) && recentOrders.length > 0 && (
             <Box mb={4}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
                 Recent Orders (From Document Uploads)
@@ -1794,7 +1794,7 @@ const StoreDetailPage: React.FC = () => {
             <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
               Historical Invoices
             </Typography>
-            {!historicalInvoices || historicalInvoices.length === 0 ? (
+            {!historicalInvoices || !Array.isArray(historicalInvoices) || historicalInvoices.length === 0 ? (
               <Alert severity="info">
                 No historical invoices available for this store.
               </Alert>
