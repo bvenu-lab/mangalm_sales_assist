@@ -868,7 +868,18 @@ async function startServer() {
     console.log('✅ Performance monitoring & metrics');
     console.log('===========================================');
 
-    await initializeConnections();
+    // Start listening immediately for Cloud Run health checks
+    app.listen(PORT, () => {
+        logger.info('SERVER', `Enterprise server started on port ${PORT}`);
+    });
+
+    // Initialize connections asynchronously (don't block server startup)
+    initializeConnections().then(() => {
+        logger.info('SERVER', 'All connections initialized successfully');
+    }).catch(error => {
+        logger.error('SERVER', 'Failed to initialize some connections', error);
+        // Server continues running even if some connections fail
+    });
 
     // Create upload directory (only for non-production)
     if (process.env.NODE_ENV !== 'production') {
@@ -878,10 +889,6 @@ async function startServer() {
         }
     }
     // In production (Cloud Run), /tmp is always available
-
-    app.listen(PORT, () => {
-        logger.info('SERVER', `Enterprise server started on port ${PORT}`);
-    });
 }
 
 startServer().catch(error => {
