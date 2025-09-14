@@ -1,0 +1,17 @@
+# Simple Dockerfile that assumes React app is already built
+FROM node:20-alpine
+WORKDIR /app
+
+# Copy only the built app and server
+COPY build ./build
+COPY server.js ./
+COPY package*.json ./
+
+# Install only express
+RUN npm install express
+
+# Expose port
+EXPOSE 8080
+
+# Start server
+CMD ["node", "server.js"]
