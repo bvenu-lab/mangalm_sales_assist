@@ -1,0 +1,13 @@
+[[build.env]]
+name = "GOOGLE_NODE_RUN_SCRIPTS"
+value = "build"
+
+[build]
+[[build.buildpacks]]
+id = "google.nodejs.runtime"
+
+[[build.buildpacks]]
+id = "google.nodejs.npm"
+
+[[build.buildpacks]]
+id = "google.nodejs.functions-framework"
