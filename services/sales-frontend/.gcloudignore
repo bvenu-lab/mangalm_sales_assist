@@ -31,3 +31,4 @@ yarn-error.log*
 # The build folder contains the compiled React app
 # server.js serves the React app
 # package files are needed for dependencies
+# Procfile tells Cloud Run how to start the app
