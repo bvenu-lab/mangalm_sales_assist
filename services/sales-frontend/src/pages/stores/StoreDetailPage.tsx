@@ -58,6 +58,8 @@ import {
   Store as StoreIcon,
   TrendingUp as TrendingUpIcon,
   Analytics as AnalyticsIcon,
+  Recommend as RecommendIcon,
+  TipsAndUpdates as TipsIcon,
   CompareArrows as CompareArrowsIcon,
   ShowChart as ShowChartIcon,
   BarChart as BarChartIcon,
@@ -145,6 +147,7 @@ const StoreDetailPage: React.FC = () => {
   const [historicalInvoices, setHistoricalInvoices] = useState<HistoricalInvoice[]>([]);
   const [callPrioritization, setCallPrioritization] = useState<CallPrioritization | null>(null);
   const [totalStores, setTotalStores] = useState<number>(0);
+  const [upsellingRecommendations, setUpsellingRecommendations] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -561,6 +564,19 @@ const StoreDetailPage: React.FC = () => {
         const callListResponse = await api.callPrioritization.getAll();
         const totalStoreCount = callListResponse?.totalStores || callListResponse?.total || 100;
         setTotalStores(totalStoreCount);
+
+        // Fetch upselling recommendations for this store
+        console.log('[StoreDetailPage] Fetching upselling recommendations...');
+        try {
+          const upsellingResponse = await apiGatewayClient.get(`/api/upselling/store/${id}`);
+          console.log('[StoreDetailPage] Upselling response:', upsellingResponse);
+          if (upsellingResponse?.success && upsellingResponse.data) {
+            setUpsellingRecommendations(upsellingResponse.data);
+          }
+        } catch (error) {
+          console.log('[StoreDetailPage] Error fetching upselling recommendations:', error);
+          // Don't fail the page load if upselling fails
+        }
         
         console.log('[StoreDetailPage] All data fetched successfully');
         console.log('[StoreDetailPage] Final store state:', storeResponse);
@@ -1122,6 +1138,7 @@ const StoreDetailPage: React.FC = () => {
         >
           <Tab label="Analytics" icon={<AnalyticsIcon />} iconPosition="start" />
           <Tab label="Predicted Orders" icon={<ShoppingCartIcon />} iconPosition="start" />
+          <Tab label="Upselling" icon={<TipsIcon />} iconPosition="start" />
           <Tab label="Order History" icon={<CalendarIcon />} iconPosition="start" />
           <Tab label="Scan Orders" icon={<CloudUploadIcon />} iconPosition="start" />
         </Tabs>

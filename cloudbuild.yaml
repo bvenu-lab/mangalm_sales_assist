@@ -42,17 +42,12 @@ steps:
           echo "db-password secret already exists"
         fi
 
-        # Grant Secret Manager access to the default compute service account
-        echo "Granting Secret Manager access to service account..."
-
-        # Grant access directly using the project number in the command
-        # This avoids any variable name confusion with Cloud Build substitutions
-        gcloud secrets add-iam-policy-binding db-password \
-          --member="serviceAccount:$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
-          --role="roles/secretmanager.secretAccessor" \
-          --project=$PROJECT_ID || echo "Permission may already exist"
-
-        echo "Service account permissions configured"
+        # Note: Secret Manager permissions must be granted manually once by an admin:
+        # gcloud secrets add-iam-policy-binding db-password \
+        #   --member="serviceAccount:445344153219-compute@developer.gserviceaccount.com" \
+        #   --role="roles/secretmanager.secretAccessor" \
+        #   --project=sales-assist-pilot
+        echo "Note: Ensure service account has Secret Manager access (must be done manually)"
 
         echo "Secrets setup complete"
 
