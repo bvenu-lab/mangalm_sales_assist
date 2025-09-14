@@ -3,8 +3,6 @@
 
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
 const { Pool } = require('pg');
 
 const app = express();
@@ -18,10 +16,6 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
 });
-
-// Security middleware
-app.use(helmet());
-app.use(compression());
 
 // CORS middleware
 app.use(cors({

@@ -974,14 +974,14 @@ const StoreDetailPage: React.FC = () => {
                         ? callPrioritization.priorityScore.toFixed(1) 
                         : parseFloat(callPrioritization.priorityScore || 0).toFixed(1)}
                     </Typography>
-                    <Chip 
+                    <Chip
                       label={
-                        callPrioritization.priorityScore >= 8 ? 'High' : 
-                        callPrioritization.priorityScore >= 5 ? 'Medium' : 'Low'
+                        callPrioritization.priorityScore <= 10 ? 'High' :
+                        callPrioritization.priorityScore <= 50 ? 'Medium' : 'Low'
                       }
                       color={
-                        callPrioritization.priorityScore >= 8 ? 'error' : 
-                        callPrioritization.priorityScore >= 5 ? 'warning' : 'default'
+                        callPrioritization.priorityScore <= 10 ? 'error' :
+                        callPrioritization.priorityScore <= 50 ? 'warning' : 'default'
                       }
                       size="small"
                     />
