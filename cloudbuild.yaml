@@ -1,7 +1,6 @@
 substitutions:
   _REGION: us-west1
   _ENV: production
-  # Note: PROJECT_NUMBER is automatically available in Cloud Build
 
 options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
@@ -46,11 +45,11 @@ steps:
         # Grant Secret Manager access to the default compute service account
         echo "Granting Secret Manager access to service account..."
         # The service account format is PROJECT_NUMBER-compute@developer.gserviceaccount.com
-        # From the error, we know it's 445344153219-compute@developer.gserviceaccount.com
 
-        # Get the project number dynamically
-        PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-        SERVICE_ACCOUNT="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+        # Get the project number using gcloud (PROJECT_NUMBER is not available in all contexts)
+        echo "Getting project number for $PROJECT_ID..."
+        PROJ_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+        SERVICE_ACCOUNT="${PROJ_NUMBER}-compute@developer.gserviceaccount.com"
 
         echo "Granting access to service account: ${SERVICE_ACCOUNT}"
 
