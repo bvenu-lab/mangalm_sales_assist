@@ -152,7 +152,8 @@
       "Bash(del test-navigation.js test-navigation-edge-cases.js final-navigation-verification.js)",
       "Bash(start http://localhost:3000/stores/4261931000000327001)",
       "Bash(start http://localhost:3000)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(start http://localhost:3000/stores)"
     ],
     "deny": [],
     "ask": []

@@ -19,6 +19,7 @@ import NotFoundPage from './pages/errors/NotFoundPage';
 import DocumentProcessingPage from './pages/documents/DocumentProcessingPage';
 import ErrorBoundary from './components/errors/ErrorBoundary';
 import NotificationProvider from './components/notifications/NotificationSystem';
+import FeedbackAssistant from './components/feedback/FeedbackAssistant';
 
 // No authentication - direct access to everything
 const NoAuthApp: React.FC = () => {
@@ -47,6 +48,8 @@ const NoAuthApp: React.FC = () => {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
+        {/* Global Feedback Assistant - appears on all pages */}
+        <FeedbackAssistant />
       </NotificationProvider>
     </ErrorBoundary>
   );

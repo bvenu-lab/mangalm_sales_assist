@@ -112,7 +112,8 @@ export interface PredictedOrderItem {
 export interface CallPrioritization {
   id: string;
   storeId: string;
-  priorityScore: number;
+  priorityScore: number;  // The rank (1, 2, 3, etc.)
+  actualScore?: number;    // The actual priority score for High/Medium/Low calculation
   priorityReason?: string;
   lastCallDate?: string;
   nextCallDate?: string;

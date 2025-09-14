@@ -394,7 +394,7 @@ const StoreDetailPage: React.FC = () => {
     console.log('[StoreDetailPage] Setting product sales data:', products, 'isArray:', Array.isArray(products));
     safeChartDataSetter(chartPoints);
     safeProductSalesDataSetter(products);
-    setVisibleProducts(new Set(products.slice(0, 5).map(p => p.productName)));
+    setVisibleProducts(new Set((products || []).slice(0, 5).map(p => p.productName)));
   };
   
   // Fetch store data
@@ -527,7 +527,8 @@ const StoreDetailPage: React.FC = () => {
             const mappedCallData = {
               id: storeCallData.storeId,
               storeId: storeCallData.storeId,
-              priorityScore: storeCallData.priorityScore || 5,
+              priorityScore: storeCallData.priorityScore || 5,  // This is the rank
+              actualScore: storeCallData.actualScore || 5,      // This is the actual score for High/Medium/Low
               priorityReason: storeCallData.priorityReason || 'Regular follow-up',
               lastCallDate: storeCallData.lastCallDate,
               nextCallDate: storeCallData.nextCallDate,
@@ -708,7 +709,7 @@ const StoreDetailPage: React.FC = () => {
   
   // Navigate to create order
   const handleCreateOrder = () => {
-    if (predictedOrders.length > 0) {
+    if (predictedOrders && predictedOrders.length > 0) {
       // Use the first predicted order
       navigate(`/orders/create/${predictedOrders[0].id}`);
     } else {
@@ -1009,30 +1010,31 @@ const StoreDetailPage: React.FC = () => {
               <Box>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="body1" fontWeight="medium">
-                    Priority Score
+                    Priority Rank
                   </Typography>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Typography variant="h6" fontWeight="bold" color="primary">
-                      {typeof callPrioritization.priorityScore === 'number' 
-                        ? callPrioritization.priorityScore.toFixed(1) 
-                        : parseFloat(callPrioritization.priorityScore || 0).toFixed(1)}
+                      #{typeof callPrioritization.priorityScore === 'number'
+                        ? callPrioritization.priorityScore
+                        : parseInt(callPrioritization.priorityScore || '0')}
                     </Typography>
                     <Chip
                       label={
                         (() => {
-                          // Calculate percentage position
-                          const percentile = (callPrioritization.priorityScore / totalStores) * 100;
-                          // Top 20% = High priority, Next 40% = Medium, Bottom 40% = Low
-                          if (percentile <= 20) return 'High';
-                          if (percentile <= 60) return 'Medium';
+                          // Use actual score for High/Medium/Low determination
+                          const score = callPrioritization.actualScore || callPrioritization.priorityScore || 5;
+                          // Scores range from ~0.5 to ~15.5
+                          // High: score >= 10, Medium: score >= 5, Low: score < 5
+                          if (score >= 10) return 'High';
+                          if (score >= 5) return 'Medium';
                           return 'Low';
                         })()
                       }
                       color={
                         (() => {
-                          const percentile = (callPrioritization.priorityScore / totalStores) * 100;
-                          if (percentile <= 20) return 'error';
-                          if (percentile <= 60) return 'warning';
+                          const score = callPrioritization.actualScore || callPrioritization.priorityScore || 5;
+                          if (score >= 10) return 'error';
+                          if (score >= 5) return 'warning';
                           return 'default';
                         })()
                       }
@@ -1421,10 +1423,10 @@ const StoreDetailPage: React.FC = () => {
                             />
                           }
                           label={
-                            <Typography variant="body2" noWrap title={product.productName}>
-                              {product.productName.length > 20 
-                                ? `${product.productName.substring(0, 20)}...` 
-                                : product.productName}
+                            <Typography variant="body2" noWrap title={product.productName || ''}>
+                              {product.productName && product.productName.length > 20
+                                ? `${product.productName.substring(0, 20)}...`
+                                : product.productName || 'Unknown Product'}
                             </Typography>
                           }
                         />
@@ -1739,9 +1741,214 @@ const StoreDetailPage: React.FC = () => {
             </Box>
           )}
         </TabPanel>
-        
-        {/* Order History Tab */}
+
+        {/* Upselling Tab */}
         <TabPanel value={tabValue} index={2}>
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Upselling Recommendations
+            </Typography>
+
+            {!upsellingRecommendations || !Array.isArray(upsellingRecommendations) || upsellingRecommendations.length === 0 ? (
+              <Alert severity="info">
+                No upselling recommendations available for this store.
+              </Alert>
+            ) : (
+              <Grid container spacing={3}>
+                {(upsellingRecommendations || []).map((recommendation: any, index: number) => (
+                  <Grid item xs={12} md={6} lg={4} key={recommendation.productId || index}>
+                    <Card
+                      sx={{
+                        height: '100%',
+                        border: recommendation.confidence >= 0.7 ? '2px solid' : '1px solid',
+                        borderColor: recommendation.confidence >= 0.7 ? 'primary.main' : 'divider',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: 3
+                        }
+                      }}
+                    >
+                      <CardContent>
+                        {/* Product Header */}
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                          <Box flex={1}>
+                            <Typography variant="h6" gutterBottom>
+                              {recommendation.productName}
+                            </Typography>
+                            {recommendation.category && (
+                              <Chip
+                                label={recommendation.category}
+                                size="small"
+                                sx={{ mr: 1, mb: 1 }}
+                              />
+                            )}
+                            {recommendation.brand && (
+                              <Chip
+                                label={recommendation.brand}
+                                size="small"
+                                variant="outlined"
+                                sx={{ mb: 1 }}
+                              />
+                            )}
+                          </Box>
+                          <Box textAlign="right">
+                            <Typography variant="body2" color="text.secondary">
+                              Confidence
+                            </Typography>
+                            <Typography
+                              variant="h6"
+                              color={
+                                recommendation.confidence >= 0.7 ? 'success.main' :
+                                recommendation.confidence >= 0.4 ? 'warning.main' : 'text.secondary'
+                              }
+                            >
+                              {(recommendation.confidence * 100).toFixed(0)}%
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Justification/Reasoning */}
+                        <Alert
+                          severity={
+                            recommendation.confidence >= 0.7 ? 'success' :
+                            recommendation.confidence >= 0.4 ? 'warning' : 'info'
+                          }
+                          sx={{ mb: 2 }}
+                        >
+                          <Typography variant="body2">
+                            {recommendation.justification}
+                          </Typography>
+                        </Alert>
+
+                        {/* Pricing Information */}
+                        <Box mb={2}>
+                          <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                              <Typography variant="body2" color="text.secondary">
+                                Unit Price
+                              </Typography>
+                              <Typography variant="h6">
+                                {formatCurrency(recommendation.unitPrice || 0)}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6}>
+                              <Typography variant="body2" color="text.secondary">
+                                Suggested Qty
+                              </Typography>
+                              <Typography variant="h6">
+                                {recommendation.suggestedQuantity || 0}
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Box>
+
+                        {/* Expected Revenue */}
+                        <Box
+                          sx={{
+                            p: 2,
+                            bgcolor: 'primary.main',
+                            color: 'primary.contrastText',
+                            borderRadius: 1,
+                            textAlign: 'center'
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            Expected Revenue
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold">
+                            {formatCurrency(recommendation.expectedRevenue || 0)}
+                          </Typography>
+                        </Box>
+
+                        {/* Action Buttons */}
+                        <Box display="flex" gap={1} mt={2}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            fullWidth
+                            onClick={() => {
+                              // Add to order functionality
+                              console.log('Add to order:', recommendation);
+                            }}
+                          >
+                            Add to Order
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={() => {
+                              // View details functionality
+                              console.log('View details:', recommendation);
+                            }}
+                          >
+                            Details
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+
+            {/* Summary Statistics */}
+            {upsellingRecommendations && Array.isArray(upsellingRecommendations) && upsellingRecommendations.length > 0 && (
+              <Box mt={4}>
+                <Paper elevation={2} sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Upselling Summary
+                  </Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={3}>
+                      <Box textAlign="center">
+                        <Typography variant="body2" color="text.secondary">
+                          Total Recommendations
+                        </Typography>
+                        <Typography variant="h4">
+                          {(upsellingRecommendations || []).length}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Box textAlign="center">
+                        <Typography variant="body2" color="text.secondary">
+                          High Confidence
+                        </Typography>
+                        <Typography variant="h4" color="success.main">
+                          {(upsellingRecommendations || []).filter((r: any) => r.confidence >= 0.7).length}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Box textAlign="center">
+                        <Typography variant="body2" color="text.secondary">
+                          Avg Confidence
+                        </Typography>
+                        <Typography variant="h4">
+                          {((upsellingRecommendations || []).reduce((sum: number, r: any) => sum + r.confidence, 0) / ((upsellingRecommendations || []).length || 1) * 100).toFixed(0)}%
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Box textAlign="center">
+                        <Typography variant="body2" color="text.secondary">
+                          Total Potential Revenue
+                        </Typography>
+                        <Typography variant="h4" color="primary.main">
+                          {formatCurrency((upsellingRecommendations || []).reduce((sum: number, r: any) => sum + (r.expectedRevenue || 0), 0))}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Box>
+            )}
+          </Box>
+        </TabPanel>
+
+        {/* Order History Tab */}
+        <TabPanel value={tabValue} index={3}>
           <Typography variant="h6" gutterBottom>
             Order History
           </Typography>
@@ -1916,7 +2123,7 @@ const StoreDetailPage: React.FC = () => {
         </TabPanel>
 
         {/* Scan Orders Tab */}
-        <TabPanel value={tabValue} index={3}>
+        <TabPanel value={tabValue} index={4}>
           <Box>
             <Box mb={3}>
               <Typography variant="h6" gutterBottom>

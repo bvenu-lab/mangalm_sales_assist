@@ -47,7 +47,6 @@ import EnterpriseLineChart from '../../components/charts/EnterpriseLineChart';
 import EnterpriseBarChart from '../../components/charts/EnterpriseBarChart';
 import DocumentUpload from '../../components/documents/DocumentUpload';
 import { documentApi } from '../../services/document-api';
-import FeedbackAssistant from '../../components/feedback/FeedbackAssistant';
 
 /**
  * DashboardPage component
@@ -697,11 +696,6 @@ const DashboardPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Feedback Assistant - Always visible in lower left corner */}
-      <FeedbackAssistant
-        userEmail="user@mangalm.com"
-        userName="Sales Agent"
-      />
     </Container>
   );
 };

@@ -108,7 +108,6 @@ import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 import DocumentUpload from '../../components/documents/DocumentUpload';
 import { documentApi } from '../../services/document-api';
 import { formatCurrency } from '../../utils/formatting';
-import FeedbackAssistant from '../../components/feedback/FeedbackAssistant';
 
 // Enhanced color palette for better pie chart visualization
 const PIE_CHART_COLORS = [
@@ -1888,11 +1887,6 @@ const EnhancedDashboard: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Feedback Assistant - Always visible in lower left corner */}
-      <FeedbackAssistant
-        userEmail="user@mangalm.com"
-        userName="Sales Agent"
-      />
     </Container>
   );
 };
