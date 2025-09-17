@@ -205,8 +205,14 @@ steps:
         # Verify build was created
         ls -la build/
 
-        # Use minimal server
-        cp minimal-server.js server.js
+        # Ensure server.js exists (already should be minimal-server.js content)
+        if [ ! -f server.js ]; then
+          echo "Copying minimal-server.js to server.js"
+          cp minimal-server.js server.js
+        fi
+
+        # Verify server.js is valid JavaScript
+        node -c server.js
 
   # Deploy Sales Frontend using Docker instead of buildpacks for reliability
   - name: 'gcr.io/cloud-builders/docker'
