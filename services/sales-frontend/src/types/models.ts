@@ -66,14 +66,21 @@ export interface InvoiceItem {
 
 export interface Order {
   id: string;
-  order_number: string;
+  invoice_number: string; // Matches API response
   store_id: string;
   store_name: string;
-  order_date: string;
-  total_amount: string;
+  customer_name: string; // Add customer_name from API
+  invoice_date: string;   // Changed from order_date to match API
+  total: number;          // Changed from total_amount to match API
   status: string;
-  item_count: string;
+  item_count: number;     // Changed from string to number
   created_at: string;
+  due_date?: string;      // Add due_date for delivery expectations
+  expected_delivery_date?: string; // Add expected delivery date
+  // Legacy aliases for backward compatibility
+  order_number?: string;
+  order_date?: string;
+  total_amount?: string;
   store?: Store;
   items?: InvoiceItem[];
 }

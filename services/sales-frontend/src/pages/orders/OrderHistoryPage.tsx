@@ -75,7 +75,7 @@ const OrderHistoryPage: React.FC = () => {
     status: '',
     dateFrom: null,
     dateTo: null,
-    sortBy: 'order_date',
+    sortBy: 'invoice_date',
     sortOrder: 'desc'
   });
   
@@ -200,7 +200,7 @@ const OrderHistoryPage: React.FC = () => {
       status: '',
       dateFrom: null,
       dateTo: null,
-      sortBy: 'order_date',
+      sortBy: 'invoice_date',
       sortOrder: 'desc'
     });
     setPage(0);
@@ -437,9 +437,9 @@ const OrderHistoryPage: React.FC = () => {
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('order_date')}>
+                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('invoice_date')}>
                     Order Date
-                    {filters.sortBy === 'order_date' && (
+                    {filters.sortBy === 'invoice_date' && (
                       <SortIcon sx={{ ml: 0.5, fontSize: 18, transform: filters.sortOrder === 'desc' ? 'rotate(180deg)' : 'none' }} />
                     )}
                   </Box>
@@ -461,9 +461,9 @@ const OrderHistoryPage: React.FC = () => {
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('total_amount')}>
+                  <Box display="flex" alignItems="center" sx={{ cursor: 'pointer' }} onClick={() => handleSortChange('total')}>
                     Total
-                    {filters.sortBy === 'total_amount' && (
+                    {filters.sortBy === 'total' && (
                       <SortIcon sx={{ ml: 0.5, fontSize: 18, transform: filters.sortOrder === 'desc' ? 'rotate(180deg)' : 'none' }} />
                     )}
                   </Box>
@@ -496,7 +496,7 @@ const OrderHistoryPage: React.FC = () => {
                   >
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
-                        {String(order.id).substring(0, 8)}...
+                        {order.invoice_number || `ORD-${String(order.id).substring(0, 8)}`}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -521,7 +521,7 @@ const OrderHistoryPage: React.FC = () => {
                       <Box display="flex" alignItems="center">
                         <CalendarIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {formatDate(order.order_date)}
+                          {formatDate(order.invoice_date)}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -529,7 +529,12 @@ const OrderHistoryPage: React.FC = () => {
                       <Box display="flex" alignItems="center">
                         <ShippingIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          Not set
+                          {order.expected_delivery_date
+                            ? formatDate(order.expected_delivery_date)
+                            : order.due_date
+                              ? formatDate(order.due_date)
+                              : 'Not set'
+                          }
                         </Typography>
                       </Box>
                     </TableCell>
@@ -542,7 +547,7 @@ const OrderHistoryPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
-                        {formatCurrency(parseFloat(order.total_amount || '0'))}
+                        {formatCurrency(order.total || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">

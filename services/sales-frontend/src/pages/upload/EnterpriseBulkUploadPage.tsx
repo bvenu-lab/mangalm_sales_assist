@@ -55,19 +55,31 @@ const ENTERPRISE_CONFIG = {
 
 // Types for enterprise data
 interface UploadProgress {
-  progress: number;
-  state: string;
-  jobId: string;
-  timestamp: number;
+  progress?: number;
+  state?: string;
+  jobId?: string;
+  timestamp?: number;
+  total?: number;
+  processed?: number;
+  successful?: number;
+  failed?: number;
+  percentage?: number;
 }
 
 interface UploadResult {
   success: boolean;
   jobId?: string;
+  uploadId?: string;
   batchId?: string;
   message: string;
   sseUrl?: string;
   error?: string;
+  summary?: {
+    totalRows: number;
+    successfulRows: number;
+    failedRows: number;
+    errors?: string[];
+  };
 }
 
 interface JobStatus {
@@ -278,12 +290,91 @@ const EnterpriseBulkUploadPage: React.FC = () => {
       const response = await fetch(`${ENTERPRISE_CONFIG.API_BASE_URL}/api/job-status/${jobId}`);
       if (response.ok) {
         const status = await response.json();
+        console.log('Job status update:', status);
         setJobStatus(status);
-        setShowDetails(true); // Show the completion dialog
+
+        // Update progress for visual feedback
+        if (status.state === 'active' || status.state === 'waiting') {
+          // Continue checking every 2 seconds if still processing
+          setTimeout(() => fetchJobStatus(jobId), 2000);
+        } else if (status.state === 'completed' || status.state === 'failed') {
+          // Processing complete
+          setUploading(false);
+          setShowDetails(true);
+        } else {
+          // Unknown state, check again in 2 seconds
+          setTimeout(() => fetchJobStatus(jobId), 2000);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch job status:', error);
+      // Retry on error
+      setTimeout(() => fetchJobStatus(jobId), 3000);
     }
+  };
+
+  const startProgressPolling = (uploadId: string) => {
+    console.log('Starting progress polling for upload:', uploadId);
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`${ENTERPRISE_CONFIG.API_BASE_URL}/api/enterprise-bulk-upload/${uploadId}/progress`);
+
+        if (response.ok) {
+          const progressData = await response.json();
+          console.log('Polling progress update:', progressData);
+
+          if (progressData.success && progressData.progress) {
+            setProgress({
+              total: progressData.progress.total,
+              processed: progressData.progress.processed,
+              successful: progressData.progress.successful,
+              failed: progressData.progress.failed,
+              percentage: progressData.progress.percentage
+            });
+
+            // Check if processing is complete
+            if (progressData.status === 'completed' || progressData.status === 'failed') {
+              clearInterval(pollInterval);
+              setUploading(false);
+
+              // Set final job status-like data
+              setJobStatus({
+                totalRows: progressData.progress.total,
+                processedRows: progressData.progress.processed,
+                successCount: progressData.progress.successful,
+                errorCount: progressData.progress.failed,
+                skippedRows: 0,
+                startTime: progressData.timing?.startedAt ? new Date(progressData.timing.startedAt).getTime() : Date.now(),
+                endTime: progressData.timing?.completedAt ? new Date(progressData.timing.completedAt).getTime() : Date.now(),
+                duration: progressData.timing?.completedAt ?
+                  new Date(progressData.timing.completedAt).getTime() - new Date(progressData.timing.startedAt).getTime() : 0
+              });
+              setShowDetails(true);
+            }
+          }
+        } else {
+          console.error('Failed to fetch progress:', response.statusText);
+          // If we can't get progress, assume it's done and stop polling
+          clearInterval(pollInterval);
+          setUploading(false);
+        }
+      } catch (error) {
+        console.error('Progress polling error:', error);
+        // On error, stop polling but don't fail the upload
+        clearInterval(pollInterval);
+        setUploading(false);
+      }
+    }, 1000); // Poll every second
+
+    // Cleanup polling after 5 minutes to prevent infinite polling
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (uploading) {
+        console.log('Progress polling timeout - stopping spinner');
+        setUploading(false);
+      }
+    }, 300000); // 5 minutes
   };
 
   const handleUpload = async () => {
@@ -315,13 +406,44 @@ const EnterpriseBulkUploadPage: React.FC = () => {
       });
 
       const result: UploadResult = await response.json();
-      
+
       if (result.success) {
         setUploadResult(result);
-        
+
         if (result.sseUrl) {
           // Connect to SSE for real-time progress
           connectToProgress(result.sseUrl);
+        } else if (result.jobId) {
+          // Use jobId from result for progress tracking
+          setTimeout(() => fetchJobStatus(result.jobId!), 2000); // Start checking after 2 seconds
+        } else if (result.uploadId) {
+          // Cloud-agnostic server returns uploadId - start progress polling
+          startProgressPolling(result.uploadId);
+        } else {
+          // Immediate completion (synchronous processing)
+          setUploading(false);
+          if (result.summary) {
+            setProgress({
+              total: result.summary.totalRows || 0,
+              processed: result.summary.totalRows || 0,
+              successful: result.summary.successfulRows || 0,
+              failed: result.summary.failedRows || 0,
+              percentage: 100
+            });
+
+            // Set job status for final display
+            setJobStatus({
+              totalRows: result.summary.totalRows || 0,
+              processedRows: result.summary.totalRows || 0,
+              successCount: result.summary.successfulRows || 0,
+              errorCount: result.summary.failedRows || 0,
+              skippedRows: 0,
+              startTime: Date.now(),
+              endTime: Date.now(),
+              duration: 0
+            });
+            setShowDetails(true);
+          }
         }
       } else {
         throw new Error(result.error || result.message || 'Upload failed');
@@ -581,7 +703,7 @@ const EnterpriseBulkUploadPage: React.FC = () => {
           </Card>
 
           {/* Progress Section */}
-          {uploading && (uploadResult || progress || jobStatus) && (
+          {uploading && (
             <Card sx={{ mt: 3 }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'between', mb: 3 }}>
@@ -589,35 +711,37 @@ const EnterpriseBulkUploadPage: React.FC = () => {
                     Processing Progress
                   </Typography>
                   <Chip
-                    label={sseConnected ? 'Real-time Connected' : 'Connecting...'}
-                    color={sseConnected ? 'success' : 'warning'}
+                    label={sseConnected ? 'Real-time Connected' : (jobStatus ? 'Monitoring...' : 'Starting...')}
+                    color={sseConnected ? 'success' : (jobStatus ? 'primary' : 'warning')}
                     size="small"
                   />
                 </Box>
 
-                {jobStatus && (
-                  <>
-                    <Box sx={{ mb: 3 }}>
-                      <LinearProgress
-                        variant="determinate"
-                        value={getProgressPercentage()}
-                        sx={{ height: 8, borderRadius: 4 }}
-                      />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {jobStatus.processedRows} / {jobStatus.totalRows} rows
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {getProgressPercentage()}%
-                        </Typography>
-                      </Box>
-                    </Box>
+                {/* Show progress bar even if jobStatus is incomplete */}
+                <Box sx={{ mb: 3 }}>
+                  <LinearProgress
+                    variant={jobStatus && jobStatus.totalRows > 0 ? "determinate" : "indeterminate"}
+                    value={jobStatus ? getProgressPercentage() : 0}
+                    sx={{ height: 8, borderRadius: 4 }}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {jobStatus ? `${jobStatus.processedRows || 0} / ${jobStatus.totalRows || 0} rows` : 'Initializing...'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {jobStatus && jobStatus.totalRows > 0 ? `${getProgressPercentage()}%` : 'Starting...'}
+                    </Typography>
+                  </Box>
+                </Box>
 
+                {/* Show stats when available, or simple message when starting */}
+                {jobStatus && jobStatus.totalRows > 0 ? (
+                  <>
                     <Grid container spacing={3}>
                       <Grid item xs={6} md={3}>
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="h4" color="success.main" sx={{ fontWeight: 600 }}>
-                            {jobStatus.successCount}
+                            {jobStatus.successCount || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Successful
@@ -627,7 +751,7 @@ const EnterpriseBulkUploadPage: React.FC = () => {
                       <Grid item xs={6} md={3}>
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="h4" color="error.main" sx={{ fontWeight: 600 }}>
-                            {jobStatus.errorCount}
+                            {jobStatus.errorCount || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Errors
@@ -637,7 +761,7 @@ const EnterpriseBulkUploadPage: React.FC = () => {
                       <Grid item xs={6} md={3}>
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="h4" color="warning.main" sx={{ fontWeight: 600 }}>
-                            {jobStatus.skippedRows}
+                            {jobStatus.skippedRows || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Skipped
@@ -673,6 +797,16 @@ const EnterpriseBulkUploadPage: React.FC = () => {
                       </Box>
                     )}
                   </>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <CircularProgress size={40} sx={{ mb: 2 }} />
+                    <Typography variant="body1" color="text.secondary">
+                      {uploadResult ? 'Processing your file...' : 'Starting upload...'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      This may take a few moments depending on file size
+                    </Typography>
+                  </Box>
                 )}
               </CardContent>
             </Card>

@@ -154,7 +154,8 @@
       "Bash(start http://localhost:3000)",
       "Bash(git log:*)",
       "Bash(start http://localhost:3000/stores)",
-      "Bash(npm ci:*)"
+      "Bash(npm ci:*)",
+      "Bash(PORT=3000 npm run dev)"
     ],
     "deny": [],
     "ask": []

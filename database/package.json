@@ -8,6 +8,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "better-sqlite3": "^12.2.0",
     "csv-parser": "^3.2.0",
     "knex": "^3.0.1",
     "pg": "^8.16.3",

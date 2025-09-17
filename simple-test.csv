@@ -1,0 +1,3 @@
+Invoice ID,Invoice Number,Invoice Date,Customer Name,Product ID,Item Name,SKU,Quantity,Usage unit,Item Price,Item Total,SubTotal,Total,Invoice Status
+TEST-001,INV-TEST-001,2024-01-15,Test Store Alpha,PROD-001,Test Product Alpha,SKU-ALPHA,10,pieces,25.50,255.00,255.00,255.00,pending
+TEST-002,INV-TEST-002,2024-01-16,Test Store Beta,PROD-002,Test Product Beta,SKU-BETA,5,units,45.75,228.75,228.75,228.75,paid

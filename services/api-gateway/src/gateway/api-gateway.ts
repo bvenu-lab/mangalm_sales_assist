@@ -24,6 +24,9 @@ import enterpriseUploadRoutes, { setupWebSocket } from '../routes/enterprise-upl
 import { feedbackRoutes } from '../routes/feedback-routes';
 import { logger } from '../utils/logger';
 import { PortManager } from '../utils/port-manager';
+// Cloud-agnostic database (SQLite local, PostgreSQL cloud)
+const { getDatabase } = require('../../../../shared/database/cloud-agnostic-db');
+import sqliteRoutes from '../routes/sqlite-routes';
 
 export interface ServiceRoute {
   path: string;
@@ -46,6 +49,18 @@ export class APIGateway {
   constructor() {
     this.app = express();
     this.setupMiddleware();
+    
+    // Initialize cloud-agnostic database connection
+    try {
+      const db = getDatabase();
+      // Database initialization will happen on first query
+      logger.info('Cloud-agnostic database initialized', {
+        type: process.env.DATABASE_TYPE || 'sqlite',
+        cloud_ready: process.env.DATABASE_TYPE === 'postgresql'
+      });
+    } catch (error) {
+      logger.error('Failed to initialize cloud-agnostic database', { error });
+    }
     
     // Set up test routes BEFORE authentication
     this.app.use('/test', testUploadRoutes);
@@ -73,10 +88,9 @@ export class APIGateway {
     });
     
     // TEMPORARILY DISABLE AUTHENTICATION FOR TESTING
-    // Setup dashboard routes with real database connection
-    // Mount at /api level for frontend compatibility
-    const dashboardRouter = createDashboardRoutes();
-    this.app.use('/api', dashboardRouter);
+    // Setup SQLite-based routes for real database connection
+    this.app.use('/api', sqliteRoutes);
+    logger.info('SQLite routes initialized for real database access');
     
     // Setup performance routes  
     const performanceRouter = createPerformanceRoutes();
